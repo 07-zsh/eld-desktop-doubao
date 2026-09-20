@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 全屏、无 ActionBar；Compose 内部负责大字号与高对比主题 -->
+    <style name="Theme.ElderDesktop" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/eld_bg</item>
+        <item name="android:windowBackground">@color/eld_bg</item>
+    </style>
+</resources>

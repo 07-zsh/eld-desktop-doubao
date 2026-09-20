@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 与 demo/index.html 对齐的配色 -->
+    <color name="eld_bg">#FF16324F</color>
+    <color name="eld_bg_2">#FF1E4166</color>
+    <color name="eld_card">#FFFFFFFF</color>
+    <color name="eld_ink">#FF1F2D3D</color>
+    <color name="eld_muted">#FF6B8194</color>
+    <color name="eld_phone">#FF2FA36B</color>
+    <color name="eld_family">#FFE8862E</color>
+    <color name="eld_photo">#FF3B82C4</color>
+    <color name="eld_sos">#FFE24B3A</color>
+    <color name="eld_white">#FFFFFFFF</color>
+
+    <color name="ic_launcher_background">#FF16324F</color>
+</resources>

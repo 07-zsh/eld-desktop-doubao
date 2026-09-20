@@ -1,0 +1,6 @@
+[
+  { "name": "女儿 晓慧", "phone": "13800000001", "avatar": "daughter.jpg", "isEmergency": true, "order": 0 },
+  { "name": "儿子 志强", "phone": "13800000002", "avatar": "son.jpg", "isEmergency": false, "order": 1 },
+  { "name": "老伴", "phone": "13900000003", "avatar": "grandma.jpg", "isEmergency": false, "order": 2 },
+  { "name": "老头子", "phone": "13900000004", "avatar": "grandpa.jpg", "isEmergency": false, "order": 3 }
+]

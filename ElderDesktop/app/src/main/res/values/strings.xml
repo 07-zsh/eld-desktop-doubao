@@ -1,0 +1,39 @@
+<resources>
+    <string name="app_name">老年桌面</string>
+
+    <!-- 首页 -->
+    <string name="home_phone">电话</string>
+    <string name="home_family">家人</string>
+    <string name="home_photo">照片</string>
+    <string name="home_sos">SOS</string>
+
+    <!-- 通用 -->
+    <string name="action_back">返回</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_confirm">确认</string>
+
+    <!-- 电话 -->
+    <string name="call_title">电话</string>
+    <string name="call_dial">拨号</string>
+    <string name="call_section_contacts">家人通讯录</string>
+
+    <!-- 家人 -->
+    <string name="family_title">家人</string>
+    <string name="family_hint">点一下家人，即可打电话</string>
+
+    <!-- 照片 -->
+    <string name="photo_title">照片</string>
+    <string name="photo_empty">照片还没准备好</string>
+
+    <!-- SOS -->
+    <string name="sos_title">紧急求助</string>
+    <string name="sos_hint">遇到紧急情况？\n点下方按钮，会打电话给紧急联系人，并通知家人</string>
+    <string name="sos_arm_title">请再点一次确认！</string>
+    <string name="sos_countdown">正在倒计时，倒计时结束后将拨打电话并发送短信</string>
+    <string name="sos_triggered">已拨打紧急电话，并已短信通知家人</string>
+    <string name="sos_cooling">请稍候，正在冷却中，防止误触重复拨打</string>
+
+    <!-- 设置模式（子女） -->
+    <string name="setup_title">子女设置</string>
+    <string name="setup_done">设置完成</string>
+</resources>
