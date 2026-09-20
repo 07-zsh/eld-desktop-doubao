@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老年桌面 · 交互演示</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2316324F'/><text x='50' y='68' font-size='58' text-anchor='middle' fill='white' font-family='sans-serif'>老</text></svg>">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+<style>
+  :root{
+    --bg:#16324F;          /* 深海军蓝背景，夜间不刺眼 */
+    --bg-2:#1E4166;
+    --card:#FFFFFF;
+    --ink:#1F2D3D;
+    --muted:#6B8194;
+    --phone:#2FA36B; --family:#E8862E; --photo:#3B82C4; --sos:#E24B3A;
+    --line:#E4EBF2;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:"Noto Sans SC",-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+    background:#0E2136;
+    min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+  }
+  /* ===== 手机壳（桌面端） ===== */
+  .device{
+    width:400px;height:812px;max-width:100%;
+    background:#0A1826;border-radius:44px;padding:14px;
+    box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 0 0 2px #22364c;
+    position:relative;
+  }
+  .device::after{
+    content:"";position:absolute;top:20px;left:50%;transform:translateX(-50%);
+    width:120px;height:6px;background:#22364c;border-radius:3px;z-index:5;
+  }
+  .screen{
+    width:100%;height:100%;border-radius:30px;overflow:hidden;position:relative;
+    background:var(--bg);
+    transition:background .2s;
+  }
+  /* ===== 视图容器 ===== */
+  .view{
+    position:absolute;inset:0;display:none;flex-direction:column;
+    padding:26px 22px calc(26px + env(safe-area-inset-bottom,0px));
+  }
+  .view.active{display:flex;animation:viewIn .25s ease}
+  @keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  /* ===== 顶部条 ===== */
+  .topbar{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-shrink:0}
+  .btn-back{
+    width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.12);
+    border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .btn-back svg{width:30px;height:30px}
+  .topbar h1{color:#fff;font-size:30px;font-weight:700;flex:1}
+  /* ===== 首页 ===== */
+  .home-clock{text-align:center;color:#fff;padding:6px 0 2px}
+  #clock{font-size:84px;font-weight:900;line-height:1;letter-spacing:1px}
+  #clockDot{animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:.25}}
+  .home-date{font-size:30px;font-weight:500;margin-top:8px;opacity:.95}
+  .home-weather{
+    margin:14px auto 0;display:flex;align-items:center;gap:12px;justify-content:center;
+    background:rgba(255,255,255,.12);border-radius:40px;padding:12px 26px;width:max-content;
+    color:#fff;font-size:28px;font-weight:700;
+  }
+  .home-weather svg{width:34px;height:34px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:auto;margin-bottom:6px}
+  .tile{
+    border:none;border-radius:30px;padding:26px 12px 20px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:14px;
+    color:#fff;font-size:30px;font-weight:900;font-family:inherit;
+    box-shadow:0 10px 0 rgba(0,0,0,.18);transition:transform .08s;
+  }
+  .tile:active{transform:translateY(4px);box-shadow:0 4px 0 rgba(0,0,0,.18)}
+  .tile svg{width:56px;height:56px}
+  .tile.phone{background:var(--phone)} .tile.family{background:var(--family)}
+  .tile.photo{background:var(--photo)}  .tile.sos{background:var(--sos)}
+  /* ===== 通用列表 ===== */
+  .section-label{color:#A9C0D4;font-size:24px;font-weight:500;margin:10px 2px 14px}
+  .card{
+    background:var(--card);border-radius:26px;padding:16px;margin-bottom:16px;
+    display:flex;align-items:center;gap:18px;width:100%;border:none;cursor:pointer;
+    text-align:left;font-family:inherit;box-shadow:0 6px 0 rgba(0,0,0,.12);
+  }
+  .card:active{transform:translateY(3px)}
+  .card .ava{width:86px;height:86px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#dfe7ef}
+  .card .name{font-size:30px;font-weight:700;color:var(--ink);flex:1}
+  .card .icon{width:56px;height:56px;flex-shrink:0}
+  .card .icon.phone{color:var(--phone)} .card .icon.video{color:var(--family)}
+  /* ===== 电话首页 ===== */
+  .dial-btn{
+    width:100%;border:none;border-radius:30px;background:var(--phone);color:#fff;
+    padding:34px;display:flex;align-items:center;justify-content:center;gap:16px;
+    font-size:34px;font-weight:900;font-family:inherit;cursor:pointer;margin-top:6px;
+    box-shadow:0 10px 0 rgba(0,0,0,.18);
+  }
+  .dial-btn:active{transform:translateY(4px)}
+  .dial-btn svg{width:44px;height:44px}
+  /* ===== 照片 ===== */
+  .photo-stage{flex:1;position:relative;border-radius:26px;overflow:hidden;background:#0A1826;min-height:0}
+  .photo-stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  .photo-stage img.on{display:block;animation:viewIn .3s ease}
+  .photo-nav{position:absolute;top:50%;transform:translateY(-50%);width:56px;height:90px;
+    background:rgba(10,24,38,.5);border:none;color:#fff;font-size:40px;cursor:pointer;z-index:3}
+  .photo-nav.prev{left:0;border-radius:0 20px 20px 0}
+  .photo-nav.next{right:0;border-radius:20px 0 0 20px}
+  .photo-nav svg{width:34px;height:34px}
+  .dots{display:flex;gap:10px;justify-content:center;padding:16px 0}
+  .dots span{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.35)}
+  .dots span.on{background:#fff}
+  /* ===== 弹窗 / 确认 ===== */
+  .modal{position:absolute;inset:0;background:rgba(6,16,28,.62);display:none;align-items:center;justify-content:center;z-index:20;padding:26px}
+  .modal.active{display:flex}
+  .modal-box{background:var(--card);border-radius:30px;padding:26px 24px;width:100%;text-align:center}
+  .modal-box .big{font-size:34px;font-weight:900;color:var(--ink);margin-bottom:6px}
+  .modal-box .sub{font-size:24px;color:var(--muted);margin-bottom:24px}
+  .modal-actions{display:flex;flex-direction:column;gap:14px}
+  .modal-actions button{border:none;border-radius:24px;padding:20px;font-size:30px;font-weight:900;font-family:inherit;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;gap:12px}
+  .modal-actions .mk-phone{background:var(--phone)}
+  .modal-actions .mk-video{background:var(--family)}
+  .modal-actions .mk-cancel{background:#E6EBF1;color:var(--ink)}
+  .modal-actions .mk-sos{background:var(--sos)}
+  .modal-actions button svg{width:34px;height:34px}
+  /* ===== SOS 步骤 ===== */
+  .sos-stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;text-align:center}
+  .sos-stage .sos-big{font-size:38px;font-weight:900;color:#fff}
+  .sos-stage .sos-sub{font-size:26px;color:#A9C0D4;line-height:1.5}
+  .sos-btn{width:220px;height:220px;border-radius:50%;border:none;background:var(--sos);color:#fff;
+    font-size:44px;font-weight:900;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 12px 0 rgba(0,0,0,.22);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 12px 0 rgba(0,0,0,.22)}50%{box-shadow:0 12px 0 rgba(0,0,0,.22),0 0 0 14px rgba(226,75,58,.25)}}
+  .sos-btn:active{transform:translateY(5px)}
+  .sos-btn.armed{animation:none;background:#C0392B}
+  /* ===== 通话 / 视频 overlay ===== */
+  .call-overlay{position:absolute;inset:0;z-index:30;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:30px}
+  .call-overlay.active{display:flex}
+  .call-overlay .big-ava{width:160px;height:160px;border-radius:50%;object-fit:cover;border:6px solid rgba(255,255,255,.25)}
+  .call-overlay .who{color:#fff;font-size:38px;font-weight:900}
+  .call-overlay .state{color:#A9C0D4;font-size:28px}
+  .call-overlay .ring{color:#fff;font-size:30px;font-weight:700;display:flex;gap:10px;align-items:center}
+  .hangup{width:110px;height:110px;border-radius:50%;border:none;background:var(--sos);color:#fff;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 10px 0 rgba(0,0,0,.2);margin-top:10px}
+  .hangup svg{width:52px;height:52px}
+  .video-box{width:100%;aspect-ratio:3/4;border-radius:26px;overflow:hidden;position:relative;background:#0A1826}
+  .video-box img{width:100%;height:100%;object-fit:cover}
+  .video-box .vtag{position:absolute;left:16px;bottom:16px;background:rgba(10,24,38,.65);color:#fff;padding:8px 18px;border-radius:20px;font-size:22px}
+  .video-row{display:flex;gap:22px}
+  .video-row .hangup{width:88px;height:88px} .video-row .hangup svg{width:42px;height:42px}
+  /* ===== toast ===== */
+  .toast{position:absolute;left:50%;bottom:44px;transform:translateX(-50%) translateY(20px);
+    background:rgba(10,24,38,.95);color:#fff;padding:18px 28px;border-radius:24px;font-size:26px;font-weight:700;
+    opacity:0;transition:.25s;z-index:50;text-align:center;width:max-content;max-width:88%;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* ===== 隐藏的图片资源（src 全部静态写死，JS 仅取用） ===== */
+  #assets{display:none}
+  /* ===== 响应式：窄屏全屏手机 ===== */
+  @media (max-width:480px){
+    body{padding:0}
+    .device{width:100vw;height:100vh;border-radius:0;padding:0;box-shadow:none}
+    .device::after{display:none}
+    .screen{border-radius:0}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== 图片资源：路径均静态写在 src，JS 通过 id 取用 ===== -->
+<div id="assets">
+  <img id="g-grandma" src="assets/grandma.jpg" alt="">
+  <img id="g-grandpa" src="assets/grandpa.jpg" alt="">
+  <img id="g-daughter" src="assets/daughter.jpg" alt="">
+  <img id="g-son" src="assets/son.jpg" alt="">
+  <img id="g-family" src="assets/family.jpg" alt="">
+</div>
+
+<div class="device">
+  <div class="screen" id="screen">
+
+    <!-- ===== 视图：首页 ===== -->
+    <section class="view active" id="v-home">
+      <div class="home-clock">
+        <div id="clock">--:--</div>
+        <div class="home-date" id="homeDate">—</div>
+        <div class="home-weather">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <span id="weather">淮南 · 晴 26°</span>
+        </div>
+      </div>
+      <div class="grid">
+        <button class="tile phone" data-nav="phone"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.9.6.6 0 1.1.5 1.1 1.1V20c0 .6-.5 1.1-1.1 1.1C10.6 21 3 13.4 3 4.1 3 3.5 3.5 3 4.1 3h3.3c.6 0 1.1.5 1.1 1.1 0 1.4.2 2.7.6 3.9.1.4 0 .8-.2 1.1l-2.3 1.7z"/></svg>电话</button>
+        <button class="tile family" data-nav="family"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M15.6 14.4c2.6.3 4.9 2 5.9 4.6"/></svg>家人</button>
+        <button class="tile photo" data-nav="photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><circle cx="8.8" cy="9.6" r="1.6"/><path d="M3 16l4-4 4 4 4-4 6 5"/></svg>照片</button>
+        <button class="tile sos" data-nav="sos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5"/><circle cx="12" cy="18" r=".5" fill="currentColor"/></svg>SOS</button>
+      </div>
+    </section>
+
+    <!-- ===== 视图：电话 ===== -->
+    <section class="view" id="v-phone">
+      <div class="topbar">
+        <button class="btn-back" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h1>电话</h1>
+      </div>
+      <button class="dial-btn" id="dialBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.9.6.6 0 1.1.5 1.1 1.1V20c0 .6-.5 1.1-1.1 1.1C10.6 21 3 13.4 3 4.1 3 3.5 3.5 3 4.1 3h3.3c.6 0 1.1.5 1.1 1.1 0 1.4.2 2.7.6 3.9.1.4 0 .8-.2 1.1l-2.3 1.7z"/></svg>拨号</button>
+      <div class="section-label">家人通讯录</div>
+      <div id="contactList"></div>
+    </section>
+
+    <!-- ===== 视图：家人 ===== -->
+    <section class="view" id="v-family">
+      <div class="topbar">
+        <button class="btn-back" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h1>家人</h1>
+      </div>
+      <div class="section-label">点一下家人，选择通话方式</div>
+      <div id="familyList"></div>
+    </section>
+
+    <!-- ===== 视图：照片 ===== -->
+    <section class="view" id="v-photo">
+      <div class="topbar">
+        <button class="btn-back" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h1>照片</h1>
+      </div>
+      <div class="photo-stage">
+        <button class="photo-nav prev" id="photoPrev" aria-label="上一张"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="photo-nav next" id="photoNext" aria-label="下一张"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+        <img id="ph-0" src="assets/family.jpg" alt="" class="on">
+        <img id="ph-1" src="assets/grandma.jpg" alt="">
+        <img id="ph-2" src="assets/grandpa.jpg" alt="">
+        <img id="ph-3" src="assets/daughter.jpg" alt="">
+        <img id="ph-4" src="assets/son.jpg" alt="">
+      </div>
+      <div class="dots" id="photoDots"></div>
+    </section>
+
+    <!-- ===== 视图：SOS ===== -->
+    <section class="view" id="v-sos">
+      <div class="topbar">
+        <button class="btn-back" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h1 style="color:var(--sos)">紧急求助</h1>
+      </div>
+      <div class="sos-stage">
+        <div>
+          <div class="sos-big" id="sosTitle">遇到紧急情况？</div>
+          <div class="sos-sub" id="sosSub">点下方按钮，会打电话给<br>紧急联系人，并通知家人</div>
+        </div>
+        <button class="sos-btn" id="sosBtn">SOS</button>
+      </div>
+    </section>
+
+    <!-- ===== 弹窗：确认拨打 ===== -->
+    <div class="modal" id="m-call">
+      <div class="modal-box">
+        <div class="big" id="mCallTitle">打电话？</div>
+        <div class="sub" id="mCallSub">确认后开始拨打</div>
+        <div class="modal-actions">
+          <button class="mk-phone" id="mCallOk"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.9.6.6 0 1.1.5 1.1 1.1V20c0 .6-.5 1.1-1.1 1.1C10.6 21 3 13.4 3 4.1 3 3.5 3.5 3 4.1 3h3.3c.6 0 1.1.5 1.1 1.1 0 1.4.2 2.7.6 3.9.1.4 0 .8-.2 1.1l-2.3 1.7z"/></svg>确认拨打</button>
+          <button class="mk-cancel" id="mCallNo">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 弹窗：家人通话方式 ===== -->
+    <div class="modal" id="m-family">
+      <div class="modal-box">
+        <div class="big" id="mFamTitle">联系家人</div>
+        <div class="sub">选择一种方式</div>
+        <div class="modal-actions">
+          <button class="mk-phone" id="mFamCall"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.9.6.6 0 1.1.5 1.1 1.1V20c0 .6-.5 1.1-1.1 1.1C10.6 21 3 13.4 3 4.1 3 3.5 3.5 3 4.1 3h3.3c.6 0 1.1.5 1.1 1.1 0 1.4.2 2.7.6 3.9.1.4 0 .8-.2 1.1l-2.3 1.7z"/></svg>打电话</button>
+          <button class="mk-video" id="mFamVideo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 7h10a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2z"/><path d="M16 10l4-3v10l-4-3"/></svg>视频通话</button>
+          <button class="mk-cancel" id="mFamNo">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 通话 overlay ===== -->
+    <div class="call-overlay" id="callOverlay">
+      <img class="big-ava" id="callAva" src="" alt="">
+      <div class="who" id="callWho">正在呼叫…</div>
+      <div class="state" id="callState">呼叫中</div>
+      <div class="ring" id="callRing"></div>
+      <button class="hangup" id="callHangup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5C8 11 12 11 20 9.5M6 12.5l1.5-3M18 12.5l-1.5-3M5 17l6.5-2m0 0l6.5 2"/></svg></button>
+    </div>
+
+    <!-- ===== 视频 overlay ===== -->
+    <div class="call-overlay" id="videoOverlay">
+      <div class="video-box">
+        <img id="videoAva" src="" alt="">
+        <div class="vtag" id="videoTag">视频通话中</div>
+      </div>
+      <div class="who" id="videoWho">女儿</div>
+      <div class="video-row">
+        <button class="hangup" id="videoHangup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5C8 11 12 11 20 9.5M6 12.5l1.5-3M18 12.5l-1.5-3M5 17l6.5-2m0 0l6.5 2"/></svg></button>
+      </div>
+    </div>
+
+    <!-- ===== toast ===== -->
+    <div class="toast" id="toast"></div>
+
+  </div>
+</div>
+
+<script>
+/* ===== 模拟数据 ===== */
+var CONTACTS = [
+  {id:'g-grandma', name:'老伴'},
+  {id:'g-grandpa', name:'老头子'},
+  {id:'g-daughter', name:'女儿 晓慧'},
+  {id:'g-son', name:'儿子 志强'}
+];
+// 从隐藏资源节点读取真实 src，避免在 JS 里写死路径
+function asset(id){ return document.getElementById(id).src; }
+var EMERGENCY = {name:'女儿 晓慧', id:'g-daughter'};
+
+/* ===== 路由 ===== */
+function nav(view){
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+  document.getElementById('v-' + view).classList.add('active');
+  closeModal();
+  hideCall();
+  if(view==='phone') renderContacts();
+  if(view==='family') renderFamily();
+  if(view==='photo') initPhoto();
+  if(view==='sos') resetSos();
+}
+document.addEventListener('click', function(e){
+  var t = e.target.closest('[data-nav]');
+  if(t) nav(t.getAttribute('data-nav'));
+});
+
+/* ===== 时钟 & 天气 ===== */
+function pad(n){ return (n<10?'0':'')+n; }
+function tick(){
+  var d = new Date();
+  document.getElementById('clock').innerHTML =
+    pad(d.getHours()) + '<span id="clockDot">:</span>' + pad(d.getMinutes());
+  document.getElementById('homeDate').textContent =
+    (d.getMonth()+1)+'月'+d.getDate()+'日 · 星期'+'日一二三四五六'[d.getDay()];
+}
+tick(); setInterval(tick, 20000);
+
+/* ===== 电话 ===== */
+function renderContacts(){
+  var box = document.getElementById('contactList'); box.innerHTML='';
+  CONTACTS.forEach(function(c, i){
+    var el = document.createElement('button');
+    el.className='card'; el.style.animation='viewIn .25s ease '+(i*0.05)+'s backwards';
+    el.innerHTML = '<img class="ava" src="'+asset(c.id)+'"><span class="name">'+c.name+
+      '</span><svg class="icon phone" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.9.6.6 0 1.1.5 1.1 1.1V20c0 .6-.5 1.1-1.1 1.1C10.6 21 3 13.4 3 4.1 3 3.5 3.5 3 4.1 3h3.3c.6 0 1.1.5 1.1 1.1 0 1.4.2 2.7.6 3.9.1.4 0 .8-.2 1.1l-2.3 1.7z"/></svg>';
+    el.addEventListener('click', function(){ openCall(c); });
+    box.appendChild(el);
+  });
+}
+document.getElementById('dialBtn').addEventListener('click', function(){
+  openCall(CONTACTS[0]); // 演示：点拨号默认打给第一个家人
+});
+
+function openCall(c){
+  document.getElementById('mCallTitle').textContent='给 '+c.name+' 打电话？';
+  document.getElementById('mCallSub').textContent='确认后开始拨打';
+  var ok = document.getElementById('mCallOk');
+  ok.onclick = function(){ closeModal(); startCall(c); };
+  openModal('m-call');
+}
+
+/* ===== 家人 ===== */
+function renderFamily(){
+  var box = document.getElementById('familyList'); box.innerHTML='';
+  CONTACTS.forEach(function(c, i){
+    var el = document.createElement('button');
+    el.className='card'; el.style.animation='viewIn .25s ease '+(i*0.05)+'s backwards';
+    el.innerHTML = '<img class="ava" src="'+asset(c.id)+'"><span class="name">'+c.name+'</span>'+
+      '<svg class="icon video" viewBox="0 0 24 24" fill="currentColor"><path d="M4 7h10a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2z"/><path d="M16 10l4-3v10l-4-3"/></svg>';
+    el.addEventListener('click', function(){ openFamily(c); });
+    box.appendChild(el);
+  });
+}
+function openFamily(c){
+  document.getElementById('mFamTitle').textContent=c.name;
+  document.getElementById('mFamCall').onclick = function(){ closeModal(); startCall(c); };
+  document.getElementById('mFamVideo').onclick = function(){ closeModal(); startVideo(c); };
+  openModal('m-family');
+}
+
+/* ===== 弹窗通用 ===== */
+function openModal(id){ document.getElementById(id).classList.add('active'); }
+function closeModal(){
+  document.querySelectorAll('.modal').forEach(function(m){ m.classList.remove('active'); });
+}
+document.getElementById('mCallNo').onclick = closeModal;
+document.getElementById('mFamNo').onclick = closeModal;
+document.querySelectorAll('.modal').forEach(function(m){
+  m.addEventListener('click', function(e){ if(e.target===m) closeModal(); });
+});
+
+/* ===== 通话 & 视频 ===== */
+function startCall(c){
+  var ov = document.getElementById('callOverlay');
+  document.getElementById('callAva').src = asset(c.id);
+  document.getElementById('callWho').textContent = c.name;
+  document.getElementById('callRing').textContent = '正在呼叫…';
+  document.getElementById('callState').textContent = '正在拨打…';
+  ov.classList.add('active');
+  setTimeout(function(){
+    document.getElementById('callState').textContent='已接通';
+    document.getElementById('callRing').textContent='通话中 00:12';
+  }, 1800);
+}
+function startVideo(c){
+  var ov = document.getElementById('videoOverlay');
+  document.getElementById('videoAva').src = asset(c.id);
+  document.getElementById('videoWho').textContent = c.name;
+  document.getElementById('videoTag').textContent = '视频通话中';
+  ov.classList.add('active');
+  toast('已接通视频');
+}
+function hideCall(){
+  document.getElementById('callOverlay').classList.remove('active');
+  document.getElementById('videoOverlay').classList.remove('active');
+}
+document.getElementById('callHangup').onclick = function(){ hideCall(); toast('已挂断'); };
+document.getElementById('videoHangup').onclick = function(){ hideCall(); toast('已挂断'); };
+
+/* ===== 照片轮播 ===== */
+var photoIdx = 0, photoTotal = 5;
+function initPhoto(){
+  var dots='';
+  for(var i=0;i<photoTotal;i++){ dots+='<span'+(i===photoIdx?' class="on"':'')+'></span>'; }
+  document.getElementById('photoDots').innerHTML = dots;
+}
+function showPhoto(dir){
+  var imgs = document.querySelectorAll('.photo-stage img');
+  imgs[photoIdx].classList.remove('on');
+  photoIdx = (photoIdx + dir + photoTotal) % photoTotal;
+  imgs[photoIdx].classList.add('on');
+  initPhoto();
+}
+document.getElementById('photoPrev').onclick = function(){ showPhoto(-1); };
+document.getElementById('photoNext').onclick = function(){ showPhoto(1); };
+
+/* ===== SOS 两步确认 ===== */
+var sosArmed = false;
+function resetSos(){
+  sosArmed = false;
+  document.getElementById('sosTitle').textContent='遇到紧急情况？';
+  document.getElementById('sosSub').innerHTML='点下方按钮，会打电话给<br>紧急联系人，并通知家人';
+  var b = document.getElementById('sosBtn');
+  b.textContent='SOS'; b.classList.remove('armed');
+}
+document.getElementById('sosBtn').addEventListener('click', function(){
+  if(!sosArmed){
+    sosArmed = true;
+    document.getElementById('sosTitle').textContent='请再点一次确认！';
+    document.getElementById('sosSub').innerHTML='再点一次，就会拨打 '+EMERGENCY.name+'<br>并短信通知家人，防止误触';
+    var b = document.getElementById('sosBtn');
+    b.textContent='再次确认'; b.classList.add('armed');
+    return;
+  }
+  // 触发紧急呼叫
+  toast('紧急呼叫 '+EMERGENCY.name+' …');
+  setTimeout(function(){
+    var ov = document.getElementById('callOverlay');
+    document.getElementById('callAva').src = asset(EMERGENCY.id);
+    document.getElementById('callWho').textContent = EMERGENCY.name + '（紧急）';
+    document.getElementById('callRing').textContent = '正在连接…';
+    document.getElementById('callState').textContent='已拨打 · 已短信通知家人';
+    ov.classList.add('active');
+  }, 600);
+});
+
+/* ===== toast ===== */
+var toastTimer;
+function toast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+</script>
+</body>
+</html>
