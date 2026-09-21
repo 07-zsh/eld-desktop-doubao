@@ -74,9 +74,9 @@ fun HomeScreen(
     }
     val weather = remember { container.weatherRepository.load() }
 
-    val hh = remember(now) = SimpleDateFormat("HH", Locale.CHINA).format(now)
-    val mm = remember(now) = SimpleDateFormat("mm", Locale.CHINA).format(now)
-    val dateStr = remember(now) = SimpleDateFormat("M月d日 · EEEE", Locale.CHINA).format(now)
+    val hh = remember(now) { SimpleDateFormat("HH", Locale.CHINA).format(now) }
+    val mm = remember(now) { SimpleDateFormat("mm", Locale.CHINA).format(now) }
+    val dateStr = remember(now) { SimpleDateFormat("M月d日 · EEEE", Locale.CHINA).format(now) }
 
     // 秒点闪烁：纯动画，不重建时钟
     val blink by rememberInfiniteTransition().animateFloat(

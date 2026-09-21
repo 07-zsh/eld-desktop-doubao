@@ -5,11 +5,8 @@ import com.elder.desktop.data.model.Contact
 import com.elder.desktop.data.model.EmergencyInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 
-/**
- * 首启预置导入：解析 assets/preset/*.json 写 Room，拷贝 photos 到私有目录。
- * 幂等：已存在数据时跳过，重复初始化不重复写入（技术方案 §9.1）。
- */
 class PresetImporter(
     private val context: Context,
     private val contactDao: ContactDao,
