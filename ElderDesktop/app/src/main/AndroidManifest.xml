@@ -7,6 +7,13 @@
     <uses-permission android:name="android.permission.SEND_SMS" />
     <!-- 不申请：定位、存储、后台、推送（技术方案 §6） -->
 
+    <!-- 功能3：可见并启动白名单第三方应用（抖音/微信/快手）；采用 queries 点名，不使用 QUERY_ALL_PACKAGES -->
+    <queries>
+        <package android:name="com.ss.android.ugc.aweme" />
+        <package android:name="com.tencent.mm" />
+        <package android:name="com.smile.gifmaker" />
+    </queries>
+
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />

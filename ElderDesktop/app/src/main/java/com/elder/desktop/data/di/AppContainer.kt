@@ -5,6 +5,7 @@ import com.elder.desktop.data.local.AppDatabase
 import com.elder.desktop.data.local.PhotoStore
 import com.elder.desktop.data.local.PresetImporter
 import com.elder.desktop.data.local.SettingsStore
+import com.elder.desktop.data.repository.AppRepository
 import com.elder.desktop.data.repository.ContactRepository
 import com.elder.desktop.data.repository.PhotoRepository
 import com.elder.desktop.data.repository.SosRepository
@@ -25,6 +26,7 @@ class AppContainer(context: Context) {
     val sosRepository = SosRepository(db.emergencyDao(), settings)
     val weatherRepository = WeatherRepository(appContext)
     val presetImporter = PresetImporter(appContext, db.contactDao(), db.emergencyDao(), settings)
+    val appRepository = AppRepository(db.appDao(), appContext.packageManager)
 
     val isInitialized = settings.isInitialized
 }

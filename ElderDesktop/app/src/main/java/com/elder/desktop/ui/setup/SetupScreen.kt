@@ -34,13 +34,14 @@ import kotlinx.coroutines.launch
 /**
  * 子女设置模式（D1）：唯一允许出现系统权限弹窗的阶段。
  * 一次性授予 CALL_PHONE/SEND_SMS 并导入预置数据，长辈阶段零弹窗。
- * 导入完成后提供「管理家人」入口（联系人增删改，功能1）。
+ * 导入完成后提供「管理家人」（联系人增删改，功能1）与「管理应用」（功能3）入口。
  */
 @Composable
 fun SetupScreen(
     container: AppContainer,
     onDone: () -> Unit,
     onManageContacts: () -> Unit,
+    onManageApps: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf("正在为长辈准备桌面…") }
@@ -96,6 +97,14 @@ fun SetupScreen(
                 modifier = Modifier.fillMaxWidth().height(64.dp),
             ) {
                 Text("管理家人（增删改）", color = EldWhite,
+                    style = MaterialTheme.typography.bodyLarge)
+            }
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = onManageApps,
+                modifier = Modifier.fillMaxWidth().height(64.dp),
+            ) {
+                Text("管理应用（桌面第三行）", color = EldWhite,
                     style = MaterialTheme.typography.bodyLarge)
             }
         }

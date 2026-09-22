@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.elder.desktop.data.di.AppContainer
+import com.elder.desktop.ui.app.AppManageScreen
 import com.elder.desktop.ui.call.CallScreen
 import com.elder.desktop.ui.contact.ContactEditScreen
 import com.elder.desktop.ui.contact.ContactManageScreen
@@ -27,6 +28,7 @@ sealed interface Screen {
     data object ContactManage : Screen
     /** contactId == null 表示新增联系人；否则编辑指定联系人。 */
     data class ContactEdit(val contactId: Long?) : Screen
+    data object AppManage : Screen
 }
 
 @Composable
@@ -52,6 +54,7 @@ fun ElderDesktopRoot(container: AppContainer, startInSetup: Boolean) {
             container = container,
             onDone = goHome,
             onManageContacts = { screen = Screen.ContactManage },
+            onManageApps = { screen = Screen.AppManage },
         )
         Screen.ContactManage -> ContactManageScreen(
             container = container,
@@ -64,6 +67,10 @@ fun ElderDesktopRoot(container: AppContainer, startInSetup: Boolean) {
             contactId = s.contactId,
             onBack = { screen = Screen.ContactManage },
             onSaved = { screen = Screen.ContactManage },
+        )
+        Screen.AppManage -> AppManageScreen(
+            container = container,
+            onBack = { screen = Screen.Setup },
         )
     }
 }
