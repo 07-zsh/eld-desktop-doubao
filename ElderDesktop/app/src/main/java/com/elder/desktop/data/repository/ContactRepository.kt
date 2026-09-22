@@ -19,14 +19,18 @@ class ContactRepository(private val dao: ContactDao) {
 
     /**
      * 新增联系人：排末尾（order = max+1）；若设为紧急，先清空其他紧急标志（最多一人紧急）。
-     * @return 新联系人的 id
+     * @return 校验失败返回 null；成功返回新联系人的 id
      */
     suspend fun addContact(
         name: String,
         phone: String,
         avatarFileName: String?,
         isEmergency: Boolean,
-    ): Long {
+        wechatRemark: String? = null,
+    ): Long? {
+        val remark = wechatRemark?.trim().orEmpty().takeIf { it.isNotEmpty() }
+        val error = ContactRules.validateWechatRemark(remark, dao.allWechatRemarks(), editingId = null)
+        if (error != null) return null
         val order = ContactRules.nextOrder(dao.allOrders())
         if (ContactRules.shouldClearOtherEmergency(isEmergency)) dao.clearAllEmergency()
         return dao.insert(
@@ -36,13 +40,14 @@ class ContactRepository(private val dao: ContactDao) {
                 avatarFileName = avatarFileName,
                 isEmergency = isEmergency,
                 order = order,
+                wechatRemark = remark,
             )
         )
     }
 
     /**
      * 更新联系人：保留原 id/order；设为紧急时清空其他紧急标志。
-     * @return 更新是否成功（联系人不存在时返回 false）
+     * @return 校验失败返回 false；联系人不存在返回 false；成功返回 true
      */
     suspend fun updateContact(
         id: Long,
@@ -50,8 +55,14 @@ class ContactRepository(private val dao: ContactDao) {
         phone: String,
         avatarFileName: String?,
         isEmergency: Boolean,
+        wechatRemark: String? = null,
     ): Boolean {
         val existing = dao.getById(id) ?: return false
+        val remark = wechatRemark?.trim().orEmpty().takeIf { it.isNotEmpty() }
+        val error = ContactRules.validateWechatRemark(
+            remark, dao.otherWechatRemarks(id), editingId = id,
+        )
+        if (error != null) return false
         if (ContactRules.shouldClearOtherEmergency(isEmergency)) dao.clearAllEmergency()
         dao.update(
             existing.copy(
@@ -59,6 +70,7 @@ class ContactRepository(private val dao: ContactDao) {
                 phone = phone.trim(),
                 avatarFileName = avatarFileName,
                 isEmergency = isEmergency,
+                wechatRemark = remark,
             )
         )
         return true

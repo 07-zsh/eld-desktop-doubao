@@ -42,6 +42,7 @@ fun SetupScreen(
     onDone: () -> Unit,
     onManageContacts: () -> Unit,
     onManageApps: () -> Unit,
+    onCalibrateWechat: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf("正在为长辈准备桌面…") }
@@ -105,6 +106,14 @@ fun SetupScreen(
                 modifier = Modifier.fillMaxWidth().height(64.dp),
             ) {
                 Text("管理应用（桌面第三行）", color = EldWhite,
+                    style = MaterialTheme.typography.bodyLarge)
+            }
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = onCalibrateWechat,
+                modifier = Modifier.fillMaxWidth().height(64.dp),
+            ) {
+                Text("校准微信视频（一键视频）", color = EldWhite,
                     style = MaterialTheme.typography.bodyLarge)
             }
         }

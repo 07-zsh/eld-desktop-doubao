@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.elder.desktop.data.di.AppContainer
+import com.elder.desktop.data.local.WechatCalibration
 import com.elder.desktop.data.model.Contact
 import com.elder.desktop.ui.common.ContactRow
 import com.elder.desktop.ui.common.TopBar
@@ -26,6 +27,7 @@ import com.elder.desktop.ui.theme.EldBg
 import com.elder.desktop.ui.theme.EldSub
 import com.elder.desktop.util.Caller
 import com.elder.desktop.util.Guard
+import com.elder.desktop.wxvideo.WechatVideoCallService
 import java.io.File
 
 @Composable
@@ -33,6 +35,14 @@ fun FamilyScreen(container: AppContainer, onBack: () -> Unit) {
     val context = LocalContext.current
     val contacts by produceState<List<Contact>>(initialValue = emptyList(), container) {
         container.contactRepository.observeContacts().collect { value = it }
+    }
+    val calibration by produceState(
+        initialValue = WechatCalibration.empty(), container,
+    ) {
+        container.wechatCalibration.flow.collect { c -> value = c }
+    }
+    val a11yEnabled = produceState(initialValue = false) {
+        value = WechatVideoCallService.isEnabled(context)
     }
 
     Column(
@@ -43,13 +53,24 @@ fun FamilyScreen(container: AppContainer, onBack: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 10.dp))
         LazyColumn(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(14.dp)) {
             items(contacts, key = { it.id }) { c ->
+                val canVideo = !c.wechatRemark.isNullOrBlank() &&
+                    calibration.calibrated && a11yEnabled.value
                 ContactRow(
                     contact = c,
                     avatarFile = avatarOf(context, c.avatarFileName),
-                ) {
-                    Guard.tap(context)
-                    Caller.call(context, c.phone)
-                }
+                    onClick = {
+                        Guard.tap(context)
+                        Caller.call(context, c.phone)
+                    },
+                    onVideoClick = if (canVideo) {
+                        {
+                            Guard.tap(context)
+                            WechatVideoCallService.instance?.startCall(
+                                c.wechatRemark.orEmpty(), calibration,
+                            )
+                        }
+                    } else null,
+                )
             }
         }
     }

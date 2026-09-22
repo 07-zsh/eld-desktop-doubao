@@ -22,6 +22,7 @@ object PresetParser {
                 avatarFileName = o.optString("avatar").takeIf { it.isNotEmpty() },
                 isEmergency = o.optBoolean("isEmergency", false),
                 order = o.optInt("order", i),
+                wechatRemark = o.optString("wechatRemark").takeIf { it.isNotEmpty() },
             )
         }
     }

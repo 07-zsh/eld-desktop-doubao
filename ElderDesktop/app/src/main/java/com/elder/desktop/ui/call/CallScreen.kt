@@ -81,10 +81,11 @@ fun CallScreen(container: AppContainer, onBack: () -> Unit) {
                 ContactRow(
                     contact = c,
                     avatarFile = avatarOf(context, c.avatarFileName),
-                ) {
-                    Guard.tap(context)
-                    Caller.call(context, c.phone)
-                }
+                    onClick = {
+                        Guard.tap(context)
+                        Caller.call(context, c.phone)
+                    },
+                )
             }
         }
     }

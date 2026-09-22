@@ -85,8 +85,10 @@ fun ContactEditScreen(
 
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var wechatRemark by remember { mutableStateOf("") }
     var avatarFileName by remember { mutableStateOf<String?>(null) }
     var isEmergency by remember { mutableStateOf(false) }
+    var errorMsg by remember { mutableStateOf<String?>(null) }
     var loaded by remember { mutableStateOf(contactId == null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -97,6 +99,7 @@ fun ContactEditScreen(
             if (c != null) {
                 name = c.name
                 phone = c.phone
+                wechatRemark = c.wechatRemark.orEmpty()
                 avatarFileName = c.avatarFileName
                 isEmergency = c.isEmergency
             }
@@ -200,6 +203,30 @@ fun ContactEditScreen(
         )
         Spacer(Modifier.height(16.dp))
 
+        Text("微信备注（用于一键视频）", color = EldSub, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = wechatRemark,
+            onValueChange = { wechatRemark = it; errorMsg = null },
+            singleLine = true,
+            textStyle = fieldStyle,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = EldCard,
+                unfocusedContainerColor = EldCard,
+                focusedTextColor = EldInk,
+                unfocusedTextColor = EldInk,
+                cursorColor = EldPhone,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("该家人在你微信里的备注名（必须全表唯一）", color = EldMuted,
+                style = MaterialTheme.typography.bodyMedium) },
+        )
+        if (errorMsg != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(errorMsg!!, color = EldSos, style = MaterialTheme.typography.bodyMedium)
+        }
+        Spacer(Modifier.height(16.dp))
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -222,11 +249,21 @@ fun ContactEditScreen(
                 if (name.isBlank() || phone.isBlank()) return@Button
                 scope.launch {
                     if (contactId == null) {
-                        container.contactRepository.addContact(name, phone, avatarFileName, isEmergency)
-                    } else {
-                        container.contactRepository.updateContact(
-                            contactId, name, phone, avatarFileName, isEmergency,
+                        val ok = container.contactRepository.addContact(
+                            name, phone, avatarFileName, isEmergency, wechatRemark,
                         )
+                        if (ok == null) {
+                            errorMsg = "微信备注已存在，请改为唯一备注"
+                            return@launch
+                        }
+                    } else {
+                        val ok = container.contactRepository.updateContact(
+                            contactId, name, phone, avatarFileName, isEmergency, wechatRemark,
+                        )
+                        if (!ok) {
+                            errorMsg = "微信备注已存在，请改为唯一备注"
+                            return@launch
+                        }
                     }
                     onSaved()
                 }

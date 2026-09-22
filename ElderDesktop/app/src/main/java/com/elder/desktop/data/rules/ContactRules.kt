@@ -23,4 +23,28 @@ object ContactRules {
      * @return 是否应清除其他联系人的紧急标志
      */
     fun shouldClearOtherEmergency(isEmergency: Boolean): Boolean = isEmergency
+
+    /**
+     * 微信备注名合法性/唯一性规则（功能2 一键微信视频）。
+     *
+     * 微信备注用于搜索路径剪贴板定位联系人：
+     *  1. 允许留空——留空表示该家人未启用微信视频（家人页不显示视频按钮）；
+     *  2. 若填写则要求全表唯一（重复备注会让搜索结果/点击对象不确定，点错人风险）。
+     *
+     * @param remark 本次提交的微信备注（可能为 null/空白）
+     * @param existingRemarks 其他联系人（排除自身 id）已有的非空微信备注
+     * @param editingId 正在编辑的联系人 id；新增时为 null（null 表示不是编辑既有联系人）
+     * @return 校验通过返回 null，否则返回错误提示
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun validateWechatRemark(
+        remark: String?,
+        existingRemarks: List<String>,
+        editingId: Long?,
+    ): String? {
+        val trimmed = remark?.trim().orEmpty()
+        if (trimmed.isEmpty()) return null // 留空 = 不启用微信视频，合法
+        if (existingRemarks.any { it == trimmed }) return "微信备注「$trimmed」已存在，请改为唯一备注"
+        return null
+    }
 }

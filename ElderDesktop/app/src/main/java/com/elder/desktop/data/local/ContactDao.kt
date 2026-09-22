@@ -40,6 +40,12 @@ interface ContactDao {
     @Query("SELECT COUNT(*) FROM contacts")
     suspend fun count(): Int
 
+    @Query("SELECT wechatRemark FROM contacts WHERE wechatRemark IS NOT NULL AND wechatRemark != ''")
+    suspend fun allWechatRemarks(): List<String>
+
+    @Query("SELECT wechatRemark FROM contacts WHERE wechatRemark IS NOT NULL AND wechatRemark != '' AND id != :editingId")
+    suspend fun otherWechatRemarks(editingId: Long): List<String>
+
     @Query("DELETE FROM contacts")
     suspend fun clear()
 }

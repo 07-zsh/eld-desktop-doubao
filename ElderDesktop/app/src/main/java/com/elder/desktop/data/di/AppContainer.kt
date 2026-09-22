@@ -5,6 +5,7 @@ import com.elder.desktop.data.local.AppDatabase
 import com.elder.desktop.data.local.PhotoStore
 import com.elder.desktop.data.local.PresetImporter
 import com.elder.desktop.data.local.SettingsStore
+import com.elder.desktop.data.local.WechatCalibrationStore
 import com.elder.desktop.data.repository.AppRepository
 import com.elder.desktop.data.repository.ContactRepository
 import com.elder.desktop.data.repository.PhotoRepository
@@ -27,6 +28,7 @@ class AppContainer(context: Context) {
     val weatherRepository = WeatherRepository(appContext)
     val presetImporter = PresetImporter(appContext, db.contactDao(), db.emergencyDao(), settings)
     val appRepository = AppRepository(db.appDao(), appContext.packageManager)
+    val wechatCalibration = WechatCalibrationStore(appContext)
 
     val isInitialized = settings.isInitialized
 }

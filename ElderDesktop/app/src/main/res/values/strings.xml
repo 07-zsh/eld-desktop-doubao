@@ -36,4 +36,11 @@
     <!-- 设置模式（子女） -->
     <string name="setup_title">子女设置</string>
     <string name="setup_done">设置完成</string>
+
+    <!-- 功能2：一键微信视频 -->
+    <string name="wechat_video_a11y_label">老年桌面微信视频服务</string>
+    <string name="wechat_video_a11y_desc">用于在长辈点击「视频通话」时，自动帮其在微信里发起视频通话（仅在长辈点按该按钮时执行）。</string>
+    <string name="family_video">视频通话</string>
+    <string name="setup_calibrate_wechat">校准微信视频</string>
+    <string name="calib_title">校准微信视频</string>
 </resources>

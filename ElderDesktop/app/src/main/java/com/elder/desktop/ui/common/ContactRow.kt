@@ -33,13 +33,15 @@ import com.elder.desktop.ui.theme.EldInk
 import com.elder.desktop.ui.theme.EldPhone
 
 /**
- * 联系人卡片：大头像 + 大字姓名 + 电话图标。电话/家人模块复用。
+ * 联系人卡片：大头像 + 大字姓名 + 电话图标。
+ * 电话/家人模块复用；[onVideoClick] 非空时在电话图标前追加「视频」按钮（功能2 一键微信视频）。
  */
 @Composable
 fun ContactRow(
     contact: Contact,
     avatarFile: java.io.File?,
     onClick: () -> Unit,
+    onVideoClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -78,6 +80,19 @@ fun ContactRow(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f),
         )
+        if (onVideoClick != null) {
+            Text(
+                "视频",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(EldPhone)
+                    .clickable { onVideoClick() }
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+        }
         Icon(Icons.Filled.Phone, contentDescription = "拨打", tint = EldPhone,
             modifier = Modifier.size(48.dp))
     }
