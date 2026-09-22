@@ -4,6 +4,7 @@ import android.content.Context
 import com.elder.desktop.data.model.Contact
 import com.elder.desktop.data.model.EmergencyInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -25,7 +26,8 @@ class PresetImporter(
     }
 
     suspend fun importIfNeeded(): Result = withContext(Dispatchers.IO) {
-        if (contactDao.count() > 0) return@withContext Result.AlreadyInitialized
+        // 以「已初始化」标记判断，而非联系人条数：避免子女删光联系人后再次导入预置数据（功能1 边界修复）
+        if (settings.isInitialized.first()) return@withContext Result.AlreadyInitialized
 
         val contacts = runCatching {
             PresetParser.parseContacts(readAsset("preset/contacts.json"))
