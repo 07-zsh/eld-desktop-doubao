@@ -10,7 +10,7 @@ import com.elder.desktop.data.model.AppEntry
 import com.elder.desktop.data.model.Contact
 import com.elder.desktop.data.model.EmergencyInfo
 
-@Database(entities = [Contact::class, EmergencyInfo::class, AppEntry::class], version = 2, exportSchema = false)
+@Database(entities = [Contact::class, EmergencyInfo::class, AppEntry::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun contactDao(): ContactDao
     abstract fun emergencyDao(): EmergencyDao
@@ -33,6 +33,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v2 -> v3 迁移 SQL：contacts 新增可空 wechatRemark 列（功能2 一键微信视频的备注定位）。 */
+        internal const val SQL_ADD_WECHAT_REMARK = "ALTER TABLE `contacts` ADD COLUMN `wechatRemark` TEXT"
+
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(SQL_ADD_WECHAT_REMARK)
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -40,7 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "elder.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }
