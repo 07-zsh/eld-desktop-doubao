@@ -23,6 +23,12 @@ import android.widget.TextView
  *  - 点「记录位置」保存坐标 → 点「验证此步」触发无障碍单步回放 → 观察微信是否命中 → 点「是/否」；
  *  - 是则进入下一步，否则重录；7 步全部通过后点「完成校准」。
  *
+ * 触摸穿透设计（关键，解决"悬浮窗锁死屏幕、无法操作微信"）：
+ *  - 全屏 UI 层：FLAG_NOT_TOUCHABLE，只显示半透明遮罩 + 提示，完全不接收触摸，触摸穿透到微信；
+ *  - 十字光标：独立小窗口（FLAG_NOT_TOUCH_MODAL），可拖动，窗口外触摸穿透；
+ *  - 底部按钮：独立小窗口（FLAG_NOT_TOUCH_MODAL），可点击，窗口外触摸穿透。
+ *  这样子女能自由操作微信（切应用、进搜索页、长按输入框），只有光标 / 按钮可点。
+ *
  * 坐标全部以相对比例（0~1）记录，跨分辨率可用。
  */
 class CalibrationOverlay(private val context: Context) {
@@ -49,7 +55,6 @@ class CalibrationOverlay(private val context: Context) {
 
     private lateinit var prompt: TextView
     private lateinit var hint: TextView
-    private lateinit var cursor: View
     private lateinit var recordBtn: Button
     private lateinit var verifyBtn: Button
     private lateinit var yesBtn: Button
@@ -60,16 +65,22 @@ class CalibrationOverlay(private val context: Context) {
     private val cursorW = (48 * density).toInt()
     private val cursorH = (48 * density).toInt()
 
-    private val overlayView: FrameLayout = buildOverlay()
+    private val uiView: View = buildUi()
+    private val btnView: View = buildButtons()
+    private val cursorView: View = buildCursor()
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun buildOverlay(): FrameLayout {
+    // 窗口参数
+    private lateinit var uiParams: WindowManager.LayoutParams
+    private lateinit var btnParams: WindowManager.LayoutParams
+    private lateinit var cursorParams: WindowManager.LayoutParams
+
+    private var cursorX = 0.5f
+    private var cursorY = 0.45f
+
+    private fun buildUi(): View {
         val root = FrameLayout(context).apply {
-            // 不拦截触摸：子女需要操作微信（切应用、进搜索页、长按输入框等），
-            // 只有十字光标和按钮消费触摸，其余区域触摸穿透到微信。
             setBackgroundColor(0x22000000.toInt())
         }
-
         prompt = TextView(context).apply {
             setBackgroundColor(0xEE1A2A3A.toInt())
             setTextColor(Color.WHITE)
@@ -83,30 +94,6 @@ class CalibrationOverlay(private val context: Context) {
             gravity = Gravity.TOP or Gravity.START
         })
 
-        // 可拖动十字光标（FrameLayout 内自由定位）
-        cursor = View(context).apply {
-            setBackgroundColor(0xFFFF6D3A.toInt())
-            alpha = 0.9f
-            setOnTouchListener { v, e ->
-                when (e.actionMasked) {
-                    MotionEvent.ACTION_MOVE -> {
-                        v.x += e.rawX - lastRawX
-                        v.y += e.rawY - lastRawY
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        cursorX = ((v.x + cursorW / 2f) / screenW).coerceIn(0f, 1f)
-                        cursorY = ((v.y + cursorH / 2f) / screenH).coerceIn(0f, 1f)
-                    }
-                }
-                lastRawX = e.rawX
-                lastRawY = e.rawY
-                true
-            }
-        }
-        cursor.x = ((screenW - cursorW) / 2f)
-        cursor.y = (screenH * 0.45f)
-        root.addView(cursor, FrameLayout.LayoutParams(cursorW, cursorH))
-
         hint = TextView(context).apply {
             setTextColor(Color.WHITE)
             textSize = 14f
@@ -118,9 +105,12 @@ class CalibrationOverlay(private val context: Context) {
         root.addView(hint, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.CENTER_HORIZONTAL or Gravity.TOP
-            topMargin = (120 * density).toInt()
+            topMargin = (150 * density).toInt()
         })
+        return root
+    }
 
+    private fun buildButtons(): View {
         val btnCol = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -139,17 +129,37 @@ class CalibrationOverlay(private val context: Context) {
 
         btnCol.addView(row1)
         btnCol.addView(row2)
-        root.addView(btnCol, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-        })
-        return root
+        return btnCol
     }
 
-    private var lastRawX = 0f
-    private var lastRawY = 0f
-    private var cursorX = 0.5f
-    private var cursorY = 0.5f
+    @SuppressLint("ClickableViewAccessibility")
+    private fun buildCursor(): View {
+        return View(context).apply {
+            setBackgroundColor(0xFFFF6D3A.toInt())
+            alpha = 0.9f
+            setOnTouchListener { v, e ->
+                when (e.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        dragDx = v.left - e.rawX
+                        dragDy = v.top - e.rawY
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        cursorParams.x = (e.rawX + dragDx).toInt()
+                        cursorParams.y = (e.rawY + dragDy).toInt()
+                        wm.updateViewLayout(cursorView, cursorParams)
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        cursorX = ((cursorParams.x + cursorW / 2f) / screenW).coerceIn(0f, 1f)
+                        cursorY = ((cursorParams.y + cursorH / 2f) / screenH).coerceIn(0f, 1f)
+                    }
+                }
+                true
+            }
+        }
+    }
+
+    private var dragDx = 0f
+    private var dragDy = 0f
 
     private fun button(text: String, onClick: () -> Unit): Button =
         Button(context).apply {
@@ -187,23 +197,46 @@ class CalibrationOverlay(private val context: Context) {
     fun show(cb: Callback) {
         callback = cb
         refresh()
-        wm.addView(overlayView, overlayParams())
+        // 层级：UI 层在最下，按钮层中间，光标层最上
+        uiParams = windowParams(
+            WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            Gravity.TOP or Gravity.START, 0, 0,
+        )
+        wm.addView(uiView, uiParams)
+
+        btnParams = windowParams(
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, 0,
+        )
+        wm.addView(btnView, btnParams)
+
+        cursorParams = windowParams(
+            cursorW, cursorH,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            Gravity.TOP or Gravity.START,
+            (screenW - cursorW) / 2, (screenH * 0.45f).toInt(),
+        )
+        wm.addView(cursorView, cursorParams)
     }
 
     fun dismiss() {
-        runCatching { wm.removeView(overlayView) }
+        runCatching { wm.removeView(uiView) }
+        runCatching { wm.removeView(btnView) }
+        runCatching { wm.removeView(cursorView) }
     }
 
-    private fun overlayParams(): WindowManager.LayoutParams =
+    private fun windowParams(
+        w: Int, h: Int, flags: Int, gravity: Int, x: Int, y: Int,
+    ): WindowManager.LayoutParams =
         WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            w, h,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
                 @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            flags,
             PixelFormat.TRANSLUCENT,
-        ).apply { gravity = Gravity.TOP or Gravity.START }
+        ).apply { this.gravity = gravity; this.x = x; this.y = y }
 }
