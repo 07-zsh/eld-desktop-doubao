@@ -81,11 +81,20 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
             }
 
             override fun onVerifyRequested(index: Int) {
+                val srv = WechatVideoCallService.instance
+                if (srv == null) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "无障碍服务未开启：请到系统「设置→无障碍→已下载的应用」开启「老年桌面微信视频服务」后重试",
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                    return
+                }
                 val cal = WechatCalibration(
                     screenW = screenW, screenH = screenH, wechatVersion = wechatVersion,
                     steps = steps.toList(), calibrated = true,
                 )
-                WechatVideoCallService.instance?.replayStep(index, cal)
+                srv.replayStep(index, cal)
             }
 
             override fun onVerified(index: Int) {
@@ -149,13 +158,23 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
 
         Button(
             onClick = {
-                if (!canDraw) {
-                    canDraw = false
-                    openOverlaySettings(context)
-                } else if (!calibrating) {
-                    calibrating = true
-                    overlay.show(callback)
-                    overlay.setStep(0, stepNames[0])
+                when {
+                    !canDraw -> {
+                        canDraw = false
+                        openOverlaySettings(context)
+                    }
+                    !WechatVideoCallService.isEnabled(context) -> {
+                        android.widget.Toast.makeText(
+                            context,
+                            "请先到系统「设置→无障碍→已下载的应用」开启「老年桌面微信视频服务」，再开始校准",
+                            android.widget.Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                    !calibrating -> {
+                        calibrating = true
+                        overlay.show(callback)
+                        overlay.setStep(0, stepNames[0])
+                    }
                 }
             },
             colors = ButtonDefaults.buttonColors(containerColor = EldWhite),

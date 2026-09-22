@@ -137,11 +137,12 @@ class CalibrationOverlay(private val context: Context) {
         return View(context).apply {
             setBackgroundColor(0xFFFF6D3A.toInt())
             alpha = 0.9f
-            setOnTouchListener { v, e ->
+            setOnTouchListener { _, e ->
                 when (e.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
-                        dragDx = v.left - e.rawX
-                        dragDy = v.top - e.rawY
+                        // 按下点在光标内的偏移 = 窗口左上角坐标 - 手指屏幕坐标
+                        dragDx = cursorParams.x - e.rawX
+                        dragDy = cursorParams.y - e.rawY
                     }
                     MotionEvent.ACTION_MOVE -> {
                         cursorParams.x = (e.rawX + dragDx).toInt()
