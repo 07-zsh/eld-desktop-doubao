@@ -31,7 +31,7 @@ gradle wrapper                 # 生成 gradlew（或直接用 Android Studio �
 ./gradlew :app:testDebugUnitTest   # 运行纯 JVM 单测
 ```
 
-> 说明：本机已配置 JDK 17 + Android SDK + Gradle 8.7，单测已通过（25 个用例全绿，含功能1 新增 11 个）；`assembleDebug` 生成 APK 可在此环境执行。
+> 说明：本机已配置 JDK 17 + Android SDK + Gradle 8.7，单测已通过（25 个用例全绿，含功能1 新增 11 个）；`assembleDebug` 生成 APK 可在此环境执行，并已在 `elder_test` 模拟器上跑通功能1 全流程（新增/编辑/删除/长辈端桌面）。
 
 ## 首次使用
 
