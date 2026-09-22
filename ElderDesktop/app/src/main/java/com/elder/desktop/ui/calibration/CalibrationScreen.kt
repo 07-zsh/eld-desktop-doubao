@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,6 +75,11 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
     var calibrating by remember { mutableStateOf(false) }
     var canDraw by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
+    // 离开校准页（完成/取消/返回）时确保移除悬浮窗，避免残留窗口点击导致异常退出 App。
+    DisposableEffect(overlay) {
+        onDispose { overlay.dismiss() }
+    }
+
     val callback = remember(overlay, steps) {
         object : CalibrationOverlay.Callback {
             override fun onRecorded(index: Int, x: Float, y: Float) {
@@ -98,8 +104,18 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
             }
 
             override fun onVerified(index: Int) {
-                if (index < 6) overlay.setStep(index + 1, stepNames[index + 1])
-                else overlay.dismiss()
+                if (index < 6) {
+                    overlay.setStep(index + 1, stepNames[index + 1])
+                } else {
+                    // 第 7 步验证通过即完成：保存校准并返回（等同 onComplete），避免悬浮窗消失但页面停留
+                    overlay.dismiss()
+                    scope.launch {
+                        container.wechatCalibration.saveCalibration(
+                            screenW, screenH, wechatVersion, steps.toList(),
+                        )
+                    }
+                    onBack()
+                }
             }
 
             override fun onRedo(index: Int) {
