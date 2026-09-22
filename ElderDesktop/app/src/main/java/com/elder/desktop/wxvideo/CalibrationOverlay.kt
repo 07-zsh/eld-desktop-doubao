@@ -65,8 +65,9 @@ class CalibrationOverlay(private val context: Context) {
     @SuppressLint("ClickableViewAccessibility")
     private fun buildOverlay(): FrameLayout {
         val root = FrameLayout(context).apply {
+            // 不拦截触摸：子女需要操作微信（切应用、进搜索页、长按输入框等），
+            // 只有十字光标和按钮消费触摸，其余区域触摸穿透到微信。
             setBackgroundColor(0x22000000.toInt())
-            setOnTouchListener { _, _ -> true } // 拦截穿透，避免误触微信
         }
 
         prompt = TextView(context).apply {
@@ -78,8 +79,8 @@ class CalibrationOverlay(private val context: Context) {
             setText("校准")
         }
         root.addView(prompt, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
-            gravity = Gravity.TOP
+            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.TOP or Gravity.START
         })
 
         // 可拖动十字光标（FrameLayout 内自由定位）
@@ -201,7 +202,8 @@ class CalibrationOverlay(private val context: Context) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
                 @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.START }
 }
