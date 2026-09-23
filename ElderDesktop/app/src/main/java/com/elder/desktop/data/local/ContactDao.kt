@@ -46,6 +46,12 @@ interface ContactDao {
     @Query("SELECT wechatRemark FROM contacts WHERE wechatRemark IS NOT NULL AND wechatRemark != '' AND id != :editingId")
     suspend fun otherWechatRemarks(editingId: Long): List<String>
 
+    @Query("SELECT wxid FROM contacts WHERE wxid IS NOT NULL AND wxid != ''")
+    suspend fun allWxids(): List<String>
+
+    @Query("SELECT wxid FROM contacts WHERE wxid IS NOT NULL AND wxid != '' AND id != :editingId")
+    suspend fun otherWxids(editingId: Long): List<String>
+
     @Query("DELETE FROM contacts")
     suspend fun clear()
 }

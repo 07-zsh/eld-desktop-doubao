@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家人页六宫格改版 · Demo</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2316324F'/><text x='50' y='68' font-size='58' text-anchor='middle' fill='white' font-family='sans-serif'>老</text></svg>">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+<style>
+  :root{
+    --bg:#16324F;          /* 深海军蓝，与应用一致 */
+    --bg-2:#1E4166;
+    --card:#FFFFFF;
+    --ink:#1F2D3D;
+    --muted:#6B8194;
+    --phone:#2FA36B;       /* 视频按钮用绿色，与 ContactRow 源码一致 */
+    --family:#E8862E;
+    --line:#E4EBF2;
+    --new:#E24B3A;         /* 新增 wxid 字段的强调色 */
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:"Noto Sans SC",-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+    background:#0E2136;min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:24px 16px;gap:18px;
+  }
+  .demo-bar{
+    display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;
+    color:#A9C0D4;font-size:14px;
+  }
+  .demo-bar button{
+    border:1px solid #2E5578;background:#16324F;color:#EAF3FB;
+    padding:8px 16px;border-radius:20px;font-size:14px;cursor:pointer;font-family:inherit;
+  }
+  .demo-bar button.active{background:#2FA36B;border-color:#2FA36B;color:#fff}
+  .demo-note{color:#8AA3B8;font-size:13px;max-width:420px;text-align:center;line-height:1.6}
+  /* ===== 手机壳 ===== */
+  .device{
+    width:400px;height:812px;max-width:100%;
+    background:#0A1826;border-radius:44px;padding:14px;
+    box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 0 0 2px #22364c;
+    position:relative;
+  }
+  .device::after{
+    content:"";position:absolute;top:20px;left:50%;transform:translateX(-50%);
+    width:120px;height:6px;background:#22364c;border-radius:3px;z-index:5;
+  }
+  .screen{
+    width:100%;height:100%;border-radius:30px;overflow:hidden;position:relative;
+    background:var(--bg);
+  }
+  .view{position:absolute;inset:0;display:none;flex-direction:column;padding:26px 22px calc(26px + env(safe-area-inset-bottom,0px))}
+  .view.active{display:flex;animation:viewIn .25s ease}
+  @keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  /* ===== 顶部条 ===== */
+  .topbar{display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-shrink:0}
+  .btn-back{
+    width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.12);
+    border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .btn-back svg{width:30px;height:30px}
+  .topbar h1{color:#fff;font-size:30px;font-weight:700;flex:1}
+  .hint{color:#A9C0D4;font-size:22px;font-weight:500;margin:2px 2px 16px;flex-shrink:0}
+  /* ===== 六宫格 ===== */
+  .grid-scroll{flex:1;overflow-y:auto;min-height:0;display:flex;align-items:center}
+  .grid-scroll::-webkit-scrollbar{display:none}
+  .grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:20px;
+    width:100%;margin:auto;
+  }
+  .tile{
+    background:var(--card);border-radius:28px;padding:24px 12px 16px;
+    display:flex;flex-direction:column;align-items:center;gap:9px;
+    box-shadow:0 6px 0 rgba(0,0,0,.12);
+  }
+  .tile .ava{width:100px;height:100px;border-radius:22px;object-fit:cover;background:#dfe7ef;flex-shrink:0}
+  .tile .name{font-size:21px;font-weight:700;color:var(--ink);line-height:1.2;text-align:center}
+  .tile .remark{font-size:16px;color:var(--muted);line-height:1.2;text-align:center}
+  .tile .vbtn{
+    margin-top:2px;border:none;border-radius:20px;background:var(--phone);color:#fff;
+    display:flex;align-items:center;justify-content:center;gap:7px;
+    font-size:21px;font-weight:900;font-family:inherit;cursor:pointer;
+    width:100%;padding:12px 0;box-shadow:0 5px 0 rgba(0,0,0,.16);
+  }
+  .tile .vbtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.16)}
+  .tile .vbtn svg{width:26px;height:26px}
+  /* ===== 编辑联系人 ===== */
+  .edit-scroll{flex:1;overflow-y:auto;min-height:0}
+  .field{background:var(--card);border-radius:24px;padding:20px;margin-bottom:16px}
+  .field label{display:block;font-size:20px;color:var(--muted);margin-bottom:8px}
+  .field .val{font-size:30px;font-weight:700;color:var(--ink)}
+  .field input{
+    width:100%;border:none;outline:none;font-size:30px;font-weight:700;color:var(--ink);
+    font-family:inherit;background:transparent;
+  }
+  .field input::placeholder{color:#B9C6D2;font-weight:400}
+  .field.new{border:2px solid var(--new)}
+  .field .new-tag{
+    display:inline-block;background:var(--new);color:#fff;font-size:16px;font-weight:700;
+    padding:2px 10px;border-radius:12px;margin-left:8px;vertical-align:middle;
+  }
+  .ava-edit{display:flex;align-items:center;gap:16px}
+  .ava-edit img{width:96px;height:96px;border-radius:22px;object-fit:cover}
+  .field-desc{font-size:19px;color:var(--muted);margin:-6px 2px 16px;line-height:1.5}
+  .save-btn{
+    width:100%;border:none;border-radius:28px;background:var(--phone);color:#fff;
+    padding:22px;font-size:30px;font-weight:900;font-family:inherit;cursor:pointer;
+    box-shadow:0 8px 0 rgba(0,0,0,.18);margin-top:4px;
+  }
+  .save-btn:active{transform:translateY(4px);box-shadow:0 3px 0 rgba(0,0,0,.18)}
+  /* ===== 呼叫 mock overlay ===== */
+  .call-mock{position:absolute;inset:0;z-index:30;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:30px}
+  .call-mock.active{display:flex}
+  .call-mock .big-ava{width:150px;height:150px;border-radius:26px;object-fit:cover;border:6px solid rgba(255,255,255,.25)}
+  .call-mock .who{color:#fff;font-size:36px;font-weight:900}
+  .call-mock .state{color:#A9C0D4;font-size:24px;text-align:center;line-height:1.5}
+  .call-mock .steps{color:#Cfe3f2;font-size:21px;text-align:center;line-height:1.7;margin-top:6px}
+  .call-mock .steps b{color:#7FE0B0;font-weight:700}
+  .call-mock .close{
+    margin-top:10px;border:none;background:rgba(255,255,255,.14);color:#fff;
+    padding:14px 34px;border-radius:24px;font-size:26px;font-weight:700;font-family:inherit;cursor:pointer;
+  }
+  /* ===== toast ===== */
+  .toast{position:absolute;left:50%;bottom:44px;transform:translateX(-50%) translateY(20px);
+    background:rgba(10,24,38,.95);color:#fff;padding:16px 26px;border-radius:22px;font-size:24px;font-weight:700;
+    opacity:0;transition:.25s;z-index:50;text-align:center;width:max-content;max-width:88%;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* ===== 隐藏图片资源（src 静态写死） ===== */
+  #assets{display:none}
+  @media (max-width:480px){
+    body{padding:0 0 20px}
+    .device{width:100vw;height:86vh;border-radius:0;padding:0;box-shadow:none}
+    .device::after{display:none}
+    .screen{border-radius:0}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== 图片资源：路径均静态写在 src，JS 通过 id 取用 ===== -->
+<div id="assets">
+  <img id="g-daughter" src="assets/daughter.jpg" alt="">
+  <img id="g-son" src="assets/son.jpg" alt="">
+  <img id="g-grandma" src="assets/grandma.jpg" alt="">
+  <img id="g-grandpa" src="assets/grandpa.jpg" alt="">
+</div>
+
+<!-- 演示切换栏（手机壳外，非产品 UI） -->
+<div class="demo-bar">
+  <button id="btnFamily" class="active">① 家人六宫格</button>
+  <button id="btnEdit">② 编辑联系人（含 wxid）</button>
+  <button id="btnCount">显示 6 人（看滚动）</button>
+</div>
+
+<div class="device">
+  <div class="screen">
+
+    <!-- ===== 视图：家人六宫格 ===== -->
+    <section class="view active" id="v-family">
+      <div class="topbar">
+        <button class="btn-back" data-nav="family" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h1>家人</h1>
+      </div>
+      <div class="hint">点「视频」按钮，给家人打微信视频</div>
+      <div class="grid-scroll" id="gridScroll">
+        <div class="grid" id="familyGrid"></div>
+      </div>
+    </section>
+
+    <!-- ===== 视图：编辑联系人（含 wxid） ===== -->
+    <section class="view" id="v-edit">
+      <div class="topbar">
+        <button class="btn-back" data-nav="family" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h1>编辑联系人</h1>
+      </div>
+      <div class="edit-scroll">
+        <div class="field ava-edit">
+          <img id="editAva" src="" alt="">
+          <div>
+            <div class="val" id="editName">女儿 晓慧</div>
+            <div style="font-size:20px;color:var(--muted)">点击头像可更换</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>手机号</label>
+          <div class="val">138 0000 0001</div>
+        </div>
+        <div class="field">
+          <label>微信备注（展示用）</label>
+          <div class="val">晓慧</div>
+        </div>
+        <div class="field new">
+          <label>微信 ID（wxid）<span class="new-tag">新增</span></label>
+          <input id="wxidInput" type="text" value="wxid_xiaohui88" placeholder="填写后该家人可在六宫格显示">
+        </div>
+        <div class="field-desc">微信 ID（wxid）用于一键发起微信视频，在微信「聊天信息」页可查到；只显示已填 wxid 的家人。</div>
+        <button class="save-btn" id="saveBtn">保存</button>
+      </div>
+    </section>
+
+    <!-- ===== 呼叫 mock overlay（演示深链流程） ===== -->
+    <div class="call-mock" id="callMock">
+      <img class="big-ava" id="mockAva" src="" alt="">
+      <div class="who" id="mockWho"></div>
+      <div class="state" id="mockState"></div>
+      <div class="steps" id="mockSteps"></div>
+      <button class="close" id="mockClose">返回</button>
+    </div>
+
+    <!-- ===== toast ===== -->
+    <div class="toast" id="toast"></div>
+
+  </div>
+</div>
+
+<div class="demo-note">
+  演示说明：六宫格只显示「已填 wxid」的家人，空格自动隐藏、整体居中；上下可滚动。点绿色「视频」按钮即触发深链呼叫（此处为模拟流程）。
+</div>
+
+<script>
+/* ===== 模拟数据 ===== */
+/* wechatRemark：展示用；wxid：深链定位用（新增） */
+var CONTACTS = [
+  {id:'g-daughter', name:'女儿 晓慧', remark:'晓慧',   wxid:'wxid_xiaohui88'},
+  {id:'g-son',     name:'儿子 志强', remark:'志强',   wxid:'wxid_zhiqiang77'},
+  {id:'g-grandma', name:'老伴',     remark:'老伴',   wxid:'wxid_laoban66'},
+  {id:'g-grandpa', name:'老头子',   remark:'老头子', wxid:'wxid_laotou55'}
+];
+/* 第 5、6 位（仅用于演示滚动，可随意开关） */
+var EXTRA = [
+  {id:'g-son',     name:'大女儿 丽华', remark:'丽华', wxid:'wxid_lihua99'},
+  {id:'g-grandma', name:'儿子 小军',   remark:'小军', wxid:'wxid_xiaojun11'}
+];
+
+function asset(id){ return document.getElementById(id).src; }
+var showExtra = false;
+
+/* ===== 渲染六宫格 ===== */
+function renderGrid(){
+  var box = document.getElementById('familyGrid');
+  var list = CONTACTS.concat(showExtra ? EXTRA : []);
+  box.innerHTML = '';
+  list.forEach(function(c, i){
+    var tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.style.animation = 'viewIn .25s ease '+(i*0.05)+'s backwards';
+    tile.innerHTML =
+      '<img class="ava" src="'+asset(c.id)+'" alt="">' +
+      '<div class="name">'+c.name+'</div>' +
+      '<div class="remark">微信：'+c.remark+'</div>' +
+      '<button class="vbtn" data-i="'+i+'">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 7h10a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2z"/><path d="M16 10l4-3v10l-4-3"/></svg>' +
+        '视频' +
+      '</button>';
+    tile.querySelector('.vbtn').addEventListener('click', function(){ startCall(list[i]); });
+    box.appendChild(tile);
+  });
+  /* 空格隐藏：只渲染了实际联系人，grid 本身居中，无需占位 */
+}
+
+/* ===== 深链呼叫 mock ===== */
+var mockTimer;
+function startCall(c){
+  document.getElementById('mockAva').src = asset(c.id);
+  document.getElementById('mockWho').textContent = c.name;
+  document.getElementById('mockState').textContent = '正在打开微信，发起视频通话…';
+  document.getElementById('mockSteps').innerHTML =
+    '1 打开微信「'+c.remark+'」聊天窗口 <b>✓</b><br>' +
+    '2 点右下角「+」 <b>✓</b><br>' +
+    '3 点「视频通话」 <b>✓</b><br>' +
+    '4 点确认，开始呼叫';
+  document.getElementById('callMock').classList.add('active');
+  var steps = document.getElementById('mockSteps');
+  clearTimeout(mockTimer);
+  steps.innerHTML = steps.innerHTML.replace('<b>✓</b><br>2', '<b>✓</b><br>2');
+  mockTimer = setTimeout(function(){
+    document.getElementById('mockState').textContent = '已呼出，正在呼叫对方…';
+    toast('已呼出微信视频');
+  }, 1600);
+}
+document.getElementById('mockClose').onclick = function(){
+  document.getElementById('callMock').classList.remove('active');
+};
+
+/* ===== 视图切换 ===== */
+function nav(view){
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+  document.getElementById('v-' + view).classList.add('active');
+  document.getElementById('callMock').classList.remove('active');
+}
+document.addEventListener('click', function(e){
+  var t = e.target.closest('[data-nav]');
+  if(t) nav(t.getAttribute('data-nav'));
+});
+document.getElementById('btnFamily').onclick = function(){ nav('family'); setBar(this,'btnFamily'); };
+document.getElementById('btnEdit').onclick = function(){ nav('edit'); setBar(this,'btnEdit'); };
+function setBar(el, id){
+  document.querySelectorAll('.demo-bar button').forEach(function(b){ b.classList.remove('active'); });
+  el.classList.add('active');
+}
+document.getElementById('btnCount').onclick = function(){
+  showExtra = !showExtra;
+  this.textContent = showExtra ? '显示 4 人' : '显示 6 人（看滚动）';
+  renderGrid();
+};
+document.getElementById('saveBtn').onclick = function(){
+  toast('已保存（演示）');
+};
+
+/* ===== toast ===== */
+var toastTimer;
+function toast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+/* 初始渲染 */
+renderGrid();
+</script>
+</body>
+</html>

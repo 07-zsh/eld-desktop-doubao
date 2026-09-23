@@ -56,4 +56,30 @@ class ContactRulesTest {
         val err = ContactRules.validateWechatRemark("  儿子  ", listOf("儿子"), null)
         assertTrue(err != null)
     }
+
+    // ---- 功能2（改版）：微信 ID（wxid）校验 ----
+
+    @Test
+    fun blankWxidIsAllowedWhenVideoNotEnabled() {
+        assertNull(ContactRules.validateWxid(null, emptyList(), null))
+        assertNull(ContactRules.validateWxid("  ", emptyList(), null))
+        assertNull(ContactRules.validateWxid("", emptyList(), null))
+    }
+
+    @Test
+    fun uniqueWxidPasses() {
+        assertNull(ContactRules.validateWxid("wxid_aa", listOf("wxid_bb", "wxid_cc"), null))
+    }
+
+    @Test
+    fun duplicateWxidFails() {
+        val err = ContactRules.validateWxid("wxid_aa", listOf("wxid_bb", "wxid_aa"), null)
+        assertTrue(err?.contains("wxid_aa") == true)
+    }
+
+    @Test
+    fun wxidTrimmedBeforeCompare() {
+        val err = ContactRules.validateWxid("  wxid_aa  ", listOf("wxid_aa"), null)
+        assertTrue(err != null)
+    }
 }

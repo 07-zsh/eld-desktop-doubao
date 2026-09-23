@@ -38,6 +38,20 @@ class PresetParserTest {
     }
 
     @Test
+    fun parseContactsReadsWxidAndRemark() {
+        val json = """
+            [
+              {"name":"女儿 晓慧","phone":"13800000001","wechatRemark":"晓慧","wxid":"wxid_xiaohui88"},
+              {"name":"儿子 志强","phone":"13800000002"}
+            ]
+        """.trimIndent()
+        val contacts = PresetParser.parseContacts(json)
+        assertEquals("晓慧", contacts[0].wechatRemark)
+        assertEquals("wxid_xiaohui88", contacts[0].wxid)
+        assertNull(contacts[1].wxid)
+    }
+
+    @Test
     fun parseEmergencyDefaultsMessage() {
         val json = """[{"name":"女儿","phone":"13800000001"}]"""
         val e = PresetParser.parseEmergency(json).single()

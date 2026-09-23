@@ -47,4 +47,29 @@ object ContactRules {
         if (existingRemarks.any { it == trimmed }) return "微信备注「$trimmed」已存在，请改为唯一备注"
         return null
     }
+
+    /**
+     * 微信 ID（wxid）校验（功能2 六宫格 / 路线二深链定位身份）。
+     *
+     * wxid 是微信内部唯一身份标识：
+     *  1. 允许留空——留空表示该家人不进入家人页六宫格（不显示）；
+     *  2. 若填写则要求全表唯一——wxid 唯一指向一个微信账号，重复意味着同一人重复录入，
+     *     六宫格会出现两张同名卡片、且深链无法区分，故拒绝。
+     *
+     * @param wxid 本次提交的微信 ID（可能为 null/空白）
+     * @param existingWxids 其他联系人（排除自身 id）已有的非空 wxid
+     * @param editingId 正在编辑的联系人 id；新增时为 null
+     * @return 校验通过返回 null，否则返回错误提示
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun validateWxid(
+        wxid: String?,
+        existingWxids: List<String>,
+        editingId: Long?,
+    ): String? {
+        val trimmed = wxid?.trim().orEmpty()
+        if (trimmed.isEmpty()) return null // 留空 = 不进入视频入口，合法
+        if (existingWxids.any { it == trimmed }) return "微信 ID「$trimmed」已存在，请检查是否重复添加"
+        return null
+    }
 }

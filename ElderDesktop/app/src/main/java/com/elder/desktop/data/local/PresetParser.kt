@@ -23,6 +23,7 @@ object PresetParser {
                 isEmergency = o.optBoolean("isEmergency", false),
                 order = o.optInt("order", i),
                 wechatRemark = o.optString("wechatRemark").takeIf { it.isNotEmpty() },
+                wxid = o.optString("wxid").takeIf { it.isNotEmpty() },
             )
         }
     }

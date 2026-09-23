@@ -158,4 +158,52 @@ class ContactRepositoryTest {
         assertFalse(ok)
         assertEquals("备注B", repo.getById(idB)?.wechatRemark)
     }
+
+    // ---- 功能2（改版）：微信 ID（wxid）存储与唯一性 ----
+
+    @Test
+    fun addContactStoresWxid() = runBlocking {
+        val id = repo.addContact("女儿", "13800000001", null, false, "晓慧", "wxid_xiaohui")!!
+
+        val list = repo.observeContacts().first()
+        assertEquals("wxid_xiaohui", list.first { it.id == id }.wxid)
+    }
+
+    @Test
+    fun blankWxidStoresNull() = runBlocking {
+        val id = repo.addContact("老伴", "13900000001", null, false, "老伴", "  ")!!
+
+        val list = repo.observeContacts().first()
+        assertNull(list.first { it.id == id }.wxid)
+    }
+
+    @Test
+    fun addContactWithDuplicateWxidRejected() = runBlocking {
+        repo.addContact("A", "1", null, false, null, "wxid_same")
+        val result = repo.addContact("B", "2", null, false, null, "wxid_same")
+
+        assertNull(result)
+        assertEquals(1, repo.observeContacts().first().size)
+    }
+
+    @Test
+    fun updateContactWithWxidAndOwnKeptAllowed() = runBlocking {
+        val id = repo.addContact("女儿", "13800000001", null, false, "晓慧", "wxid_xiaohui")!!
+
+        assertTrue(repo.updateContact(id, "女儿", "13800000002", null, false, "晓慧", "wxid_xiaohui"))
+
+        val list = repo.observeContacts().first()
+        assertEquals("wxid_xiaohui", list.first { it.id == id }.wxid)
+    }
+
+    @Test
+    fun updateContactWithDuplicateWxidRejected() = runBlocking {
+        repo.addContact("A", "1", null, false, null, "wxid_A")
+        val idB = repo.addContact("B", "2", null, false, null, "wxid_B")!!
+
+        val ok = repo.updateContact(idB, "B", "2", null, false, null, "wxid_A")
+
+        assertFalse(ok)
+        assertEquals("wxid_B", repo.getById(idB)?.wxid)
+    }
 }

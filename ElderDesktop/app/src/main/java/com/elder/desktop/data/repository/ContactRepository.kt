@@ -27,10 +27,14 @@ class ContactRepository(private val dao: ContactDao) {
         avatarFileName: String?,
         isEmergency: Boolean,
         wechatRemark: String? = null,
+        wxid: String? = null,
     ): Long? {
         val remark = wechatRemark?.trim().orEmpty().takeIf { it.isNotEmpty() }
         val error = ContactRules.validateWechatRemark(remark, dao.allWechatRemarks(), editingId = null)
         if (error != null) return null
+        val wxidValue = wxid?.trim().orEmpty().takeIf { it.isNotEmpty() }
+        val wxidError = ContactRules.validateWxid(wxidValue, dao.allWxids(), editingId = null)
+        if (wxidError != null) return null
         val order = ContactRules.nextOrder(dao.allOrders())
         if (ContactRules.shouldClearOtherEmergency(isEmergency)) dao.clearAllEmergency()
         return dao.insert(
@@ -41,6 +45,7 @@ class ContactRepository(private val dao: ContactDao) {
                 isEmergency = isEmergency,
                 order = order,
                 wechatRemark = remark,
+                wxid = wxidValue,
             )
         )
     }
@@ -56,6 +61,7 @@ class ContactRepository(private val dao: ContactDao) {
         avatarFileName: String?,
         isEmergency: Boolean,
         wechatRemark: String? = null,
+        wxid: String? = null,
     ): Boolean {
         val existing = dao.getById(id) ?: return false
         val remark = wechatRemark?.trim().orEmpty().takeIf { it.isNotEmpty() }
@@ -63,6 +69,9 @@ class ContactRepository(private val dao: ContactDao) {
             remark, dao.otherWechatRemarks(id), editingId = id,
         )
         if (error != null) return false
+        val wxidValue = wxid?.trim().orEmpty().takeIf { it.isNotEmpty() }
+        val wxidError = ContactRules.validateWxid(wxidValue, dao.otherWxids(id), editingId = id)
+        if (wxidError != null) return false
         if (ContactRules.shouldClearOtherEmergency(isEmergency)) dao.clearAllEmergency()
         dao.update(
             existing.copy(
@@ -71,6 +80,7 @@ class ContactRepository(private val dao: ContactDao) {
                 avatarFileName = avatarFileName,
                 isEmergency = isEmergency,
                 wechatRemark = remark,
+                wxid = wxidValue,
             )
         )
         return true

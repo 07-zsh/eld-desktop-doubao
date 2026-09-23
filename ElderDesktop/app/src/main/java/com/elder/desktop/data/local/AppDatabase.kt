@@ -10,7 +10,7 @@ import com.elder.desktop.data.model.AppEntry
 import com.elder.desktop.data.model.Contact
 import com.elder.desktop.data.model.EmergencyInfo
 
-@Database(entities = [Contact::class, EmergencyInfo::class, AppEntry::class], version = 3, exportSchema = false)
+@Database(entities = [Contact::class, EmergencyInfo::class, AppEntry::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun contactDao(): ContactDao
     abstract fun emergencyDao(): EmergencyDao
@@ -42,6 +42,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 -> v4 迁移 SQL：contacts 新增可空 wxid 列（功能2 六宫格过滤 / 路线二深链定位身份）。 */
+        internal const val SQL_ADD_WXID = "ALTER TABLE `contacts` ADD COLUMN `wxid` TEXT"
+
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(SQL_ADD_WXID)
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -49,7 +58,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "elder.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }

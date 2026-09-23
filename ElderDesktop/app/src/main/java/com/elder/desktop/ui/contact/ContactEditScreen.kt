@@ -86,6 +86,7 @@ fun ContactEditScreen(
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var wechatRemark by remember { mutableStateOf("") }
+    var wxid by remember { mutableStateOf("") }
     var avatarFileName by remember { mutableStateOf<String?>(null) }
     var isEmergency by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
@@ -100,6 +101,7 @@ fun ContactEditScreen(
                 name = c.name
                 phone = c.phone
                 wechatRemark = c.wechatRemark.orEmpty()
+                wxid = c.wxid.orEmpty()
                 avatarFileName = c.avatarFileName
                 isEmergency = c.isEmergency
             }
@@ -203,7 +205,7 @@ fun ContactEditScreen(
         )
         Spacer(Modifier.height(16.dp))
 
-        Text("微信备注（用于一键视频）", color = EldSub, style = MaterialTheme.typography.bodyMedium)
+        Text("微信备注（六宫格内展示）", color = EldSub, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(6.dp))
         OutlinedTextField(
             value = wechatRemark,
@@ -219,6 +221,26 @@ fun ContactEditScreen(
             ),
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("该家人在你微信里的备注名（必须全表唯一）", color = EldMuted,
+                style = MaterialTheme.typography.bodyMedium) },
+        )
+        Spacer(Modifier.height(16.dp))
+
+        Text("微信 ID（wxid）", color = EldSub, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = wxid,
+            onValueChange = { wxid = it; errorMsg = null },
+            singleLine = true,
+            textStyle = fieldStyle,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = EldCard,
+                unfocusedContainerColor = EldCard,
+                focusedTextColor = EldInk,
+                unfocusedTextColor = EldInk,
+                cursorColor = EldPhone,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("对方的微信号 / 原始 ID（唯一），留空则不显示", color = EldMuted,
                 style = MaterialTheme.typography.bodyMedium) },
         )
         if (errorMsg != null) {
@@ -250,18 +272,18 @@ fun ContactEditScreen(
                 scope.launch {
                     if (contactId == null) {
                         val ok = container.contactRepository.addContact(
-                            name, phone, avatarFileName, isEmergency, wechatRemark,
+                            name, phone, avatarFileName, isEmergency, wechatRemark, wxid,
                         )
                         if (ok == null) {
-                            errorMsg = "微信备注已存在，请改为唯一备注"
+                            errorMsg = "微信备注或微信 ID 已存在，请改为唯一值"
                             return@launch
                         }
                     } else {
                         val ok = container.contactRepository.updateContact(
-                            contactId, name, phone, avatarFileName, isEmergency, wechatRemark,
+                            contactId, name, phone, avatarFileName, isEmergency, wechatRemark, wxid,
                         )
                         if (!ok) {
-                            errorMsg = "微信备注已存在，请改为唯一备注"
+                            errorMsg = "微信备注或微信 ID 已存在，请改为唯一值"
                             return@launch
                         }
                     }
