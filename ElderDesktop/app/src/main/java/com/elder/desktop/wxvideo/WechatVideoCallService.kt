@@ -139,9 +139,18 @@ class WechatVideoCallService : AccessibilityService() {
      * 校准阶段目标界面由子女手动切换（例如已停在搜索页时验证第 2 步长按）。
      */
     fun replayStep(index: Int, cal: WechatCalibration): Boolean {
-        if (index !in 0..6) return false
+        if (index !in 0..6) {
+            Log.w(TAG, "replayStep invalid index=$index")
+            return false
+        }
         val pt = cal.steps[index]
-        return dispatchGestureAt(pt, cal, if (index == 1) LONG_PRESS_DURATION else TAP_DURATION)
+        val dur = if (index == 1) LONG_PRESS_DURATION else TAP_DURATION
+        val ok = dispatchGestureAt(pt, cal, dur)
+        Log.i(
+            TAG,
+            "replayStep index=$index at ${pt.x},${pt.y} screen=${cal.screenW}x${cal.screenH} dur=$dur ok=$ok",
+        )
+        return ok
     }
 
     /**
