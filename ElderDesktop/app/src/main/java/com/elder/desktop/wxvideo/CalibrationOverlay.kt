@@ -2,7 +2,9 @@ package com.elder.desktop.wxvideo
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.os.Build
 import android.view.Gravity
@@ -135,9 +137,30 @@ class CalibrationOverlay(private val context: Context) {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun buildCursor(): View {
-        return View(context).apply {
-            setBackgroundColor(0xFFFF6D3A.toInt())
-            alpha = 0.9f
+        // 中心十字准星：明确指出「实际记录/点击点 = 方框正中心」，避免以为整个方框都是有效区。
+        return object : View(context) {
+            private val paint = Paint()
+            override fun onDraw(canvas: Canvas) {
+                super.onDraw(canvas)
+                val cx = width / 2f
+                val cy = height / 2f
+                val arm = width / 2f - 2f * density
+                // 黑描边 + 白十字，保证任何底色上都清晰。
+                paint.color = Color.BLACK
+                paint.strokeWidth = 4f * density
+                canvas.drawLine(cx - arm, cy, cx + arm, cy, paint)
+                canvas.drawLine(cx, cy - arm, cx, cy + arm, paint)
+                paint.color = Color.WHITE
+                paint.strokeWidth = 2f * density
+                canvas.drawLine(cx - arm, cy, cx + arm, cy, paint)
+                canvas.drawLine(cx, cy - arm, cx, cy + arm, paint)
+                // 中心点
+                paint.color = Color.BLACK
+                canvas.drawCircle(cx, cy, 2f * density, paint)
+            }
+        }.apply {
+            setBackgroundColor(0xCCFF6D3A.toInt())
+            alpha = 0.95f
             setOnTouchListener { _, e ->
                 when (e.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
