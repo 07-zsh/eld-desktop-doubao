@@ -22,10 +22,15 @@ import com.elder.desktop.data.local.WechatCalibration
  *  真实微信屏蔽无障碍节点树，无法按备注定位；故不读节点，仅用 dispatchGesture 坐标手势 +
  *  剪贴板粘贴联系人备注 + 微信顶部搜索路径，逐级回放子女校准好的 7 步坐标。
  *
- * 服务仅开启 canPerformGestures（不读窗口内容，最小权限）。
- * 时序链（自聊天列表起）：
- *  点放大镜 → 写剪贴板备注 + 长按搜索框 → 点粘贴 → 点搜索结果联系人 → 进聊天 →
- *  点右下角加号 → 点加号面板"视频通话" → 点确认"视频通话" → 发起呼叫。
+ * 时序控制（事件驱动 + 延时兜底，取代纯固定延时）：
+ *  微信会向本服务投递 TYPE_WINDOW_STATE_CHANGED（带 className + text），据实测定为两类信号：
+ *    - ChattingUI（com.tencent.mm.ui.chatting.ChattingUI）＝ 已进入目标聊天
+ *    - dialog.a4 + 文本含「视频通话」＝ 通话类型菜单已弹出
+ *  在这两处最脆弱的过渡用「等信号再点」，超时则回退按原延时执行；搜索段（放大镜/长按/粘贴/结果）
+ *  无稳定类名信号，保留固定延时兜底。链路（自聊天列表起）：
+ *    点放大镜 → 长按搜索框(粘贴备注) → 点粘贴 → 点搜索结果联系人 →
+ *    【等 ChattingUI】→ 点右下角加号 → 点面板"视频通话" →
+ *    【等 dialog.a4】→ 点菜单"视频通话" → 发起呼叫。
  */
 class WechatVideoCallService : AccessibilityService() {
 
@@ -58,11 +63,35 @@ class WechatVideoCallService : AccessibilityService() {
         private const val AFTER_PANEL_VIDEO_MS = 1500L
         private const val RESTORE_CLIPBOARD_MS = 2500L
         private const val TOTAL_TIMEOUT_MS = 30000L
+
+        // 事件驱动信号（真机实测 className）。
+        private const val CLASS_CHATTING_UI = "com.tencent.mm.ui.chatting.ChattingUI"
+        private const val CLASS_CALL_MENU = "com.tencent.mm.ui.widget.dialog.a4"
+        internal const val SIGNAL_CHAT = 1
+        internal const val SIGNAL_CALL_MENU = 2
+
+        /**
+         * 信号匹配（纯函数，可单测）：判断收到的窗口事件是否命中当前等待的信号。
+         * @param waitingSignal 当前等待的信号（SIGNAL_CHAT / SIGNAL_CALL_MENU / 0）
+         * @param cls 事件 className
+         * @param text 事件携带文本（call menu 需含「视频通话」以与其它对话框区分）
+         */
+        fun matchSignal(waitingSignal: Int, cls: String, text: List<CharSequence>?): Boolean =
+            when (waitingSignal) {
+                SIGNAL_CHAT -> cls == CLASS_CHATTING_UI
+                SIGNAL_CALL_MENU -> cls == CLASS_CALL_MENU &&
+                    text?.any { it.toString().contains("视频通话") } == true
+                else -> false
+            }
     }
 
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
     private var clipboardBackup: String? = null
+    /** 当前正在等待的信号（0=不在等待）；命中后执行 pendingStep。 */
+    private var waitingSignal = 0
+    /** 信号命中后待执行的下一步。 */
+    private var pendingStep: Runnable? = null
 
     private val timeoutRunnable = Runnable {
         Log.w(TAG, "call timeout, reset")
@@ -87,7 +116,16 @@ class WechatVideoCallService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // 只用手势，不读节点；事件仅用于保证服务存活。
+        if (!running || waitingSignal == 0) return
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val cls = event.className?.toString().orEmpty()
+        if (matchSignal(waitingSignal, cls, event.text)) {
+            Log.i(TAG, "signal received waiting=$waitingSignal cls=$cls")
+            waitingSignal = 0
+            val r = pendingStep
+            pendingStep = null
+            r?.run()
+        }
     }
 
     override fun onInterrupt() {
@@ -119,35 +157,60 @@ class WechatVideoCallService : AccessibilityService() {
         clipboardBackup = readClipboard()
         writeClipboard(remark.trim())
 
-        handler.postDelayed({ tapStep(0, cal, 0L) }, 400)
+        handler.postDelayed({ runStep(0, cal) }, 400)
         handler.postDelayed({ finishWithTimeout() }, TOTAL_TIMEOUT_MS)
         return true
     }
 
-    /** 递归式时序链：执行当前步并安排下一步。 */
-    private fun tapStep(index: Int, cal: WechatCalibration, delay: Long) {
+    /** 执行指定步骤并按策略推进下一步（延时 or 等信号）。 */
+    private fun runStep(index: Int, cal: WechatCalibration) {
         if (!running) return
+        val pt = cal.steps[index]
+        val dur = if (index == 1) LONG_PRESS_DURATION else TAP_DURATION
+        val ok = dispatchGestureAt(pt, cal, dur)
+        Log.i(TAG, "step${index + 1} (${stepName(index)}) at ${pt.x},${pt.y} ok=$ok")
+        when (index) {
+            // 点完联系人结果：等 ChattingUI（已进聊天）再点「＋」，避免点空。
+            3 -> gateNext(4, cal, SIGNAL_CHAT, AFTER_CONTACT_MS)
+            // 点完面板"视频通话"：等 dialog.a4 菜单弹出再点菜单"视频通话"。
+            5 -> gateNext(6, cal, SIGNAL_CALL_MENU, AFTER_PANEL_VIDEO_MS)
+            // 全部完成：延时恢复剪贴板并复位。
+            6 -> handler.postDelayed({ reset() }, RESTORE_CLIPBOARD_MS)
+            else -> schedule(index + 1, cal, afterDelayMs(index))
+        }
+    }
+
+    private fun schedule(index: Int, cal: WechatCalibration, delay: Long) {
+        if (!running) return
+        handler.postDelayed({ runStep(index, cal) }, delay)
+    }
+
+    /** 非信号门控步骤之间沿用固定延时（搜索段无稳定类名信号）。 */
+    private fun afterDelayMs(index: Int): Long = when (index) {
+        0 -> AFTER_ICON_MS
+        1 -> AFTER_LONG_PRESS_MS
+        2 -> AFTER_PASTE_MS
+        4 -> AFTER_PLUS_MS
+        else -> 0L
+    }
+
+    /** 信号门控：等 [signal] 命中后执行第 [index] 步；超时 [fallbackMs] 回退直接执行。 */
+    private fun gateNext(index: Int, cal: WechatCalibration, signal: Int, fallbackMs: Long) {
+        if (!running) return
+        waitingSignal = signal
+        pendingStep = Runnable {
+            waitingSignal = 0
+            runStep(index, cal)
+        }
         handler.postDelayed({
-            if (!running) return@postDelayed
-            val pt = cal.steps[index]
-            val ok = dispatchGestureAt(pt, cal, if (index == 1) LONG_PRESS_DURATION else TAP_DURATION)
-            Log.i(TAG, "step${index + 1} (${stepName(index)}) at ${pt.x},${pt.y} ok=$ok")
-            val nextDelay = when (index) {
-                0 -> AFTER_ICON_MS
-                1 -> AFTER_LONG_PRESS_MS
-                2 -> AFTER_PASTE_MS
-                3 -> AFTER_CONTACT_MS
-                4 -> AFTER_PLUS_MS
-                5 -> AFTER_PANEL_VIDEO_MS
-                else -> 0L
+            if (waitingSignal == signal) {
+                Log.w(TAG, "signal $signal timeout for step${index + 1}, fallback")
+                waitingSignal = 0
+                val r = pendingStep
+                pendingStep = null
+                r?.run()
             }
-            if (index < 6) {
-                tapStep(index + 1, cal, nextDelay)
-            } else {
-                // 全部步骤完成：延时恢复剪贴板并复位
-                handler.postDelayed({ reset() }, RESTORE_CLIPBOARD_MS)
-            }
-        }, delay)
+        }, fallbackMs)
     }
 
     private fun stepName(index: Int): String = when (index) {
@@ -193,9 +256,11 @@ class WechatVideoCallService : AccessibilityService() {
         }
     }
 
-    /** 复位：停止本轮、恢复剪贴板。 */
+    /** 复位：停止本轮、清信号、恢复剪贴板。 */
     private fun reset() {
         running = false
+        waitingSignal = 0
+        pendingStep = null
         handler.removeCallbacksAndMessages(null)
         clipboardBackup?.let { writeClipboard(it) }
         clipboardBackup = null
