@@ -62,8 +62,8 @@ class CalibrationOverlay(private val context: Context) {
     private lateinit var prevBtn: Button
     private lateinit var doneBtn: Button
 
-    private val cursorW = (48 * density).toInt()
-    private val cursorH = (48 * density).toInt()
+    private val cursorW = (28 * density).toInt()
+    private val cursorH = (28 * density).toInt()
 
     private val uiView: View = buildUi()
     private val btnView: View = buildButtons()
@@ -82,7 +82,7 @@ class CalibrationOverlay(private val context: Context) {
             setBackgroundColor(0x22000000.toInt())
         }
         prompt = TextView(context).apply {
-            setBackgroundColor(0xEE1A2A3A.toInt())
+            setBackgroundColor(0x8C1A2A3A.toInt())
             setTextColor(Color.WHITE)
             textSize = 16f
             setPadding((16 * density).toInt(), (12 * density).toInt(),
@@ -98,7 +98,7 @@ class CalibrationOverlay(private val context: Context) {
         hint = TextView(context).apply {
             setTextColor(Color.WHITE)
             textSize = 14f
-            setBackgroundColor(0xAA000000.toInt())
+            setBackgroundColor(0x59000000.toInt())
             setPadding((8 * density).toInt(), (6 * density).toInt(),
                 (8 * density).toInt(), (6 * density).toInt())
             text = "拖动橙色光标对准目标，再点「记录位置」"
