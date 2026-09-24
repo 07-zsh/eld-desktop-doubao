@@ -122,7 +122,7 @@ class CalibrationOverlay(private val context: Context) {
         row1.addView(prevBtn); row1.addView(recordBtn); row1.addView(verifyBtn)
 
         val row2 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-        yesBtn = button("是(通过)") { callback?.onVerified(currentIndex); phase = 2; refresh() }
+        yesBtn = button("是(通过)") { callback?.onVerified(currentIndex) }
         noBtn = button("否(重录)") { callback?.onRedo(currentIndex); phase = 0; refresh() }
         doneBtn = button("完成校准") { callback?.onComplete() }
         row2.addView(yesBtn); row2.addView(noBtn); row2.addView(doneBtn)
