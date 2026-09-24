@@ -1,5 +1,7 @@
 package com.elder.desktop.ui.calibration
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -47,6 +49,7 @@ import com.elder.desktop.ui.theme.EldSub
 import com.elder.desktop.ui.theme.EldWhite
 import com.elder.desktop.wxvideo.CalibrationOverlay
 import com.elder.desktop.wxvideo.WechatVideoCallService
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -209,6 +212,15 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
                     !calibrating -> {
                         calibrating = true
                         toast("开始校准：请看手机屏幕悬浮窗，从第 1 步做起")
+                        // 预写第一位家人的微信备注到剪贴板，使第 2/3 步「长按输入框→粘贴」能呼出粘贴按钮。
+                        scope.launch {
+                            val remark = container.contactRepository.observeContacts().first()
+                                .firstNotNullOfOrNull {
+                                    it.wechatRemark?.trim()?.takeIf { r -> r.isNotEmpty() }
+                                }
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            cm.setPrimaryClip(ClipData.newPlainText("elder_cal", remark ?: "家人"))
+                        }
                         overlay.show(callback)
                         overlay.setStep(0, stepNames[0])
                     }
