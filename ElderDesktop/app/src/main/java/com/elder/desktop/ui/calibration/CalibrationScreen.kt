@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +33,9 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import com.elder.desktop.data.di.AppContainer
 import com.elder.desktop.data.local.CalibrationPoint
 import com.elder.desktop.data.local.WechatCalibration
@@ -50,6 +54,11 @@ import kotlinx.coroutines.launch
  *  A1 全手动：子女在微信界面用悬浮十字光标对准目标按钮并记录；
  *  边录边验：每步记录后由无障碍服务单步回放，子女确认命中；
  *  B2 真发验证：第 7 步确认「视频通话」后即真正发起呼叫，子女观察是否呼出。
+ *
+ * 反馈（子女操作的可感知反馈）：
+ *  - 每步记录/验证/重录均弹 Toast（「已记录第 X/7 步」「第 X 步验证通过」等）；
+ *  - 完成校准弹「校准完成！一键微信视频已可用」并自动保存、返回设置页；
+ *  - 从系统「悬浮窗授权」页返回时用 ON_RESUME 刷新权限状态，避免按钮卡在「先授权悬浮窗」。
  */
 @Composable
 fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
@@ -57,13 +66,13 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     val stepNames = listOf(
-        "微信【聊天列表】右上角放大镜（搜索）",
-        "微信【搜索页】输入框（长按呼出粘贴）",
-        "长按后弹出的「粘贴」按钮",
-        "【搜索结果】中的家人（点进聊天）",
-        "【聊天界面】右下角「+」",
-        "加号面板「视频通话」",
-        "确认菜单「视频通话」",
+        "先到微信【聊天列表】，把光标对准右上角「放大镜」（搜索）",
+        "点放大镜进【搜索页】，把光标对准顶部「输入框」（长按会呼出粘贴）",
+        "长按输入框呼出「粘贴」，把光标对准「粘贴」按钮",
+        "输入家人备注（测试甲），把光标对准【搜索结果】里的那一行（点进聊天）",
+        "已进【聊天界面】，把光标对准右下角「+」",
+        "点「+」弹出面板，把光标对准面板「视频通话」",
+        "点面板视频弹出菜单，把光标对准菜单「视频通话」（验证即真呼出）",
     )
 
     val (screenW, screenH) = remember { realMetrics(context) }
@@ -75,25 +84,50 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
     var calibrating by remember { mutableStateOf(false) }
     var canDraw by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
+    fun toast(msg: String) {
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
+
+    // 从「悬浮窗授权」页返回后刷新权限状态，否则按钮会一直停在「先授权悬浮窗」。
+    val lifecycleOwner = context as? LifecycleOwner
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                canDraw = Settings.canDrawOverlays(context)
+            }
+        }
+        lifecycleOwner?.lifecycle?.addObserver(observer)
+        onDispose { lifecycleOwner?.lifecycle?.removeObserver(observer) }
+    }
+
     // 离开校准页（完成/取消/返回）时确保移除悬浮窗，避免残留窗口点击导致异常退出 App。
     DisposableEffect(overlay) {
         onDispose { overlay.dismiss() }
+    }
+
+    // 统一收尾：关闭悬浮窗、保存校准、弹完成反馈、返回设置页。
+    fun completeCalibration() {
+        overlay.dismiss()
+        toast("校准完成！一键微信视频已可用")
+        scope.launch {
+            container.wechatCalibration.saveCalibration(
+                screenW, screenH, wechatVersion, steps.toList(),
+            )
+        }
+        onBack()
     }
 
     val callback = remember(overlay, steps) {
         object : CalibrationOverlay.Callback {
             override fun onRecorded(index: Int, x: Float, y: Float) {
                 steps[index] = CalibrationPoint(x, y)
+                toast("已记录第 ${index + 1}/7 步坐标，可点「验证此步」")
             }
 
             override fun onVerifyRequested(index: Int) {
                 val srv = WechatVideoCallService.instance
                 if (srv == null) {
-                    android.widget.Toast.makeText(
-                        context,
-                        "无障碍服务未开启：请到系统「设置→无障碍→已下载的应用」开启「老年桌面微信视频服务」后重试",
-                        android.widget.Toast.LENGTH_LONG,
-                    ).show()
+                    toast("无障碍服务未开启：请到系统「设置→无障碍→已下载的应用」开启「老年桌面微信视频服务」后重试")
                     return
                 }
                 val cal = WechatCalibration(
@@ -101,25 +135,20 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
                     steps = steps.toList(), calibrated = true,
                 )
                 srv.replayStep(index, cal)
+                toast("已回放第 ${index + 1} 步，请观察微信是否命中，再点「是」或「否」")
             }
 
             override fun onVerified(index: Int) {
+                toast("第 ${index + 1}/7 步验证通过")
                 if (index < 6) {
                     overlay.setStep(index + 1, stepNames[index + 1])
                 } else {
-                    // 第 7 步验证通过即完成：保存校准并返回（等同 onComplete），避免悬浮窗消失但页面停留
-                    overlay.dismiss()
-                    scope.launch {
-                        container.wechatCalibration.saveCalibration(
-                            screenW, screenH, wechatVersion, steps.toList(),
-                        )
-                    }
-                    onBack()
+                    completeCalibration()
                 }
             }
 
             override fun onRedo(index: Int) {
-                // 重录：由 overlay 内部回到待记录阶段
+                toast("第 ${index + 1} 步重录，请重新对准目标")
             }
 
             override fun onStepChanged(index: Int) {
@@ -127,17 +156,12 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
             }
 
             override fun onComplete() {
-                overlay.dismiss()
-                scope.launch {
-                    container.wechatCalibration.saveCalibration(
-                        screenW, screenH, wechatVersion, steps.toList(),
-                    )
-                }
-                onBack()
+                completeCalibration()
             }
 
             override fun onCancel() {
                 overlay.dismiss()
+                toast("已取消校准")
             }
         }
     }
@@ -180,14 +204,11 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
                         openOverlaySettings(context)
                     }
                     !WechatVideoCallService.isEnabled(context) -> {
-                        android.widget.Toast.makeText(
-                            context,
-                            "请先到系统「设置→无障碍→已下载的应用」开启「老年桌面微信视频服务」，再开始校准",
-                            android.widget.Toast.LENGTH_LONG,
-                        ).show()
+                        toast("请先到系统「设置→无障碍→已下载的应用」开启「老年桌面微信视频服务」，再开始校准")
                     }
                     !calibrating -> {
                         calibrating = true
+                        toast("开始校准：请看手机屏幕悬浮窗，从第 1 步做起")
                         overlay.show(callback)
                         overlay.setStep(0, stepNames[0])
                     }
