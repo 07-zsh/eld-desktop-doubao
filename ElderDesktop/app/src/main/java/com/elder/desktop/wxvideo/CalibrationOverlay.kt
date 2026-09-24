@@ -89,8 +89,9 @@ class CalibrationOverlay(private val context: Context) {
                 (16 * density).toInt(), (12 * density).toInt())
             setText("校准")
         }
+        // 指引条限定在左上角约 55% 宽度、自动换行，避免横跨全屏盖住微信顶部右上角（放大镜/搜索框）等校准目标。
         root.addView(prompt, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
+            (screenW * 0.55f).toInt(), FrameLayout.LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.TOP or Gravity.START
         })
 
