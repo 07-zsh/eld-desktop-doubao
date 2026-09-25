@@ -57,6 +57,8 @@ class WechatVideoCallService : AccessibilityService() {
         // 各步骤之间的间隔（毫秒）。长按后粘贴气泡会快速消失，须短延迟点击。
         private const val AFTER_ICON_MS = 2500L
         private const val AFTER_LONG_PRESS_MS = 500L
+        /** 先轻点聚焦搜索框、再长按呼出「粘贴」之间的间隔。 */
+        private const val TAP_THEN_LONG_GAP_MS = 250L
         private const val AFTER_PASTE_MS = 2000L
         private const val AFTER_CONTACT_MS = 2500L
         private const val AFTER_PLUS_MS = 2000L
@@ -153,11 +155,20 @@ class WechatVideoCallService : AccessibilityService() {
             return false
         }
         val pt = cal.steps[index]
-        val dur = if (index == 1) LONG_PRESS_DURATION else TAP_DURATION
-        val ok = dispatchGestureAt(pt, cal, dur)
+        if (index == 1) {
+            // 第 2 步（长按搜索框呼出「粘贴」）：先轻点确保搜索框聚焦，再长按。
+            // 若只单次长按，搜索框未聚焦时首次长按可能只聚焦、不弹粘贴（表现为"点击无粘贴"）。
+            longPressSearchBox(pt, cal)
+            Log.i(
+                TAG,
+                "replayStep index=1 tapThenLong at ${pt.x},${pt.y} screen=${cal.screenW}x${cal.screenH}",
+            )
+            return true
+        }
+        val ok = dispatchGestureAt(pt, cal, TAP_DURATION)
         Log.i(
             TAG,
-            "replayStep index=$index at ${pt.x},${pt.y} screen=${cal.screenW}x${cal.screenH} dur=$dur ok=$ok",
+            "replayStep index=$index at ${pt.x},${pt.y} screen=${cal.screenW}x${cal.screenH} dur=$TAP_DURATION ok=$ok",
         )
         return ok
     }
@@ -223,9 +234,14 @@ class WechatVideoCallService : AccessibilityService() {
     private fun runStep(index: Int, cal: WechatCalibration) {
         if (!running) return
         val pt = cal.steps[index]
-        val dur = if (index == 1) LONG_PRESS_DURATION else TAP_DURATION
-        val ok = dispatchGestureAt(pt, cal, dur)
-        Log.i(TAG, "step${index + 1} (${stepName(index)}) at ${pt.x},${pt.y} ok=$ok")
+        if (index == 1) {
+            // 长按搜索框：先轻点聚焦，再长按，确保呼出「粘贴」（与校准 replayStep 一致）。
+            longPressSearchBox(pt, cal)
+            Log.i(TAG, "step2 (longPressSearchBox) tapThenLong at ${pt.x},${pt.y}")
+        } else {
+            val ok = dispatchGestureAt(pt, cal, TAP_DURATION)
+            Log.i(TAG, "step${index + 1} (${stepName(index)}) at ${pt.x},${pt.y} ok=$ok")
+        }
         when (index) {
             // 点完联系人结果：等 ChattingUI（已进聊天）再点「＋」，避免点空。
             3 -> gateNext(4, cal, SIGNAL_CHAT, AFTER_CONTACT_MS)
@@ -278,6 +294,15 @@ class WechatVideoCallService : AccessibilityService() {
         4 -> "plus"
         5 -> "panelVideo"
         else -> "confirmVideo"
+    }
+
+    /** 搜索框长按呼出「粘贴」：先轻点确保输入框聚焦，间隔后再长按。 */
+    private fun longPressSearchBox(pt: CalibrationPoint, cal: WechatCalibration) {
+        dispatchGestureAt(pt, cal, TAP_DURATION)
+        handler.postDelayed(
+            { dispatchGestureAt(pt, cal, LONG_PRESS_DURATION) },
+            TAP_THEN_LONG_GAP_MS,
+        )
     }
 
     private fun dispatchGestureAt(pt: CalibrationPoint, cal: WechatCalibration, duration: Int): Boolean {
