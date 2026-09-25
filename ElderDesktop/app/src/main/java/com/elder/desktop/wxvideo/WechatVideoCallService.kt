@@ -14,7 +14,6 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.elder.desktop.data.local.CalibrationPoint
 import com.elder.desktop.data.local.WechatCalibration
-import com.elder.desktop.util.AppLauncher
 
 /**
  * 功能2「一键微信视频」无障碍服务。
@@ -29,7 +28,7 @@ import com.elder.desktop.util.AppLauncher
  *    - dialog.a4 + 文本含「视频通话」＝ 通话类型菜单已弹出
  *  在这两处最脆弱的过渡用「等信号再点」，超时则回退按原延时执行；搜索段（放大镜/长按/粘贴/结果）
  *  无稳定类名信号，保留固定延时兜底。链路（自拉起微信起）：
- *    拉起微信(等 LauncherUI 主界面) → 点放大镜 → 长按搜索框(粘贴备注) → 点粘贴 → 点搜索结果联系人 →
+ *    拉起微信(CLEAR_TASK 强制回干净聊天列表, 等 LauncherUI 主界面) → 点放大镜 → 长按搜索框(粘贴备注) → 点粘贴 → 点搜索结果联系人 →
  *    【等 ChattingUI】→ 点右下角加号 → 点面板"视频通话" →
  *    【等 dialog.a4】→ 点菜单"视频通话" → 发起呼叫。
  */
@@ -56,14 +55,14 @@ class WechatVideoCallService : AccessibilityService() {
         private const val LONG_PRESS_DURATION = 600
 
         // 各步骤之间的间隔（毫秒）。长按后粘贴气泡会快速消失，须短延迟点击。
-        private const val AFTER_ICON_MS = 2000L
+        private const val AFTER_ICON_MS = 2500L
         private const val AFTER_LONG_PRESS_MS = 500L
         private const val AFTER_PASTE_MS = 2000L
         private const val AFTER_CONTACT_MS = 2500L
         private const val AFTER_PLUS_MS = 2000L
         private const val AFTER_PANEL_VIDEO_MS = 1500L
         private const val RESTORE_CLIPBOARD_MS = 2500L
-        private const val TOTAL_TIMEOUT_MS = 40000L
+        private const val TOTAL_TIMEOUT_MS = 45000L
 
         // 事件驱动信号（真机实测 className）。
         private const val CLASS_CHATTING_UI = "com.tencent.mm.ui.chatting.ChattingUI"
@@ -72,7 +71,9 @@ class WechatVideoCallService : AccessibilityService() {
         private const val CLASS_WECHAT_MAIN = "com.tencent.mm.ui.LauncherUI"
         private const val WECHAT_PACKAGE = "com.tencent.mm"
         /** 拉起微信后等主界面信号的超时兜底（冷启动偏慢）；超时则直接开始第 1 步。 */
-        private const val WECHAT_LAUNCH_FALLBACK_MS = 6000L
+        private const val WECHAT_LAUNCH_FALLBACK_MS = 8000L
+        /** LauncherUI 信号命中后、列表可能仍在加载，等其渲染稳定再点放大镜。 */
+        private const val WECHAT_LIST_SETTLE_MS = 1200L
         internal const val SIGNAL_CHAT = 1
         internal const val SIGNAL_CALL_MENU = 2
         internal const val SIGNAL_WECHAT_MAIN = 3
@@ -176,17 +177,46 @@ class WechatVideoCallService : AccessibilityService() {
 
         // 关键前提修复：7 步坐标从「微信聊天列表」起算，但点「视频」时手机并不在微信。
         // 故先拉起微信到前台（聊天列表），等微信主界面（LauncherUI）信号命中后再开始第 1 步；
-        // 冷启动慢/类名未命中时 6s 超时兜底直接开始。
+        // 冷启动慢/类名未命中时超时兜底直接开始。
         launchWechat()
-        gateNext(0, cal, SIGNAL_WECHAT_MAIN, WECHAT_LAUNCH_FALLBACK_MS)
+        gateStartAfterWechat(cal)
         handler.postDelayed({ finishWithTimeout() }, TOTAL_TIMEOUT_MS)
         return true
     }
 
-    /** 拉起微信到前台（复用功能三 AppLauncher，ACTION_MAIN + CATEGORY_LAUNCHER）。 */
+    /**
+     * 拉起微信到前台并强制回到干净聊天列表。
+     * 不能用 getLaunchIntentForPackage 的恢复式启动：若微信后台停留在某个聊天/搜索界面，
+     * 会恢复旧界面而非聊天列表，导致校准坐标对不上。故用 FLAG_ACTIVITY_CLEAR_TASK 清栈重建主界面。
+     */
     private fun launchWechat() {
-        val ok = AppLauncher.launch(this, WECHAT_PACKAGE)
-        Log.i(TAG, "launch wechat ok=$ok")
+        val ok = runCatching {
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                `package` = WECHAT_PACKAGE
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
+            startActivity(intent)
+        }.isSuccess
+        Log.i(TAG, "launch wechat (clear task) ok=$ok")
+    }
+
+    /** 等微信主界面信号命中后，先等列表渲染稳定，再开始第 1 步（点放大镜）。 */
+    private fun gateStartAfterWechat(cal: WechatCalibration) {
+        waitingSignal = SIGNAL_WECHAT_MAIN
+        pendingStep = Runnable {
+            waitingSignal = 0
+            handler.postDelayed({ runStep(0, cal) }, WECHAT_LIST_SETTLE_MS)
+        }
+        handler.postDelayed({
+            if (waitingSignal == SIGNAL_WECHAT_MAIN) {
+                Log.w(TAG, "wechat main signal timeout, fallback start")
+                waitingSignal = 0
+                val r = pendingStep
+                pendingStep = null
+                r?.run()
+            }
+        }, WECHAT_LAUNCH_FALLBACK_MS)
     }
 
     /** 执行指定步骤并按策略推进下一步（延时 or 等信号）。 */
