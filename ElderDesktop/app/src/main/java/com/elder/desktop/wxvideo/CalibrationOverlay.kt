@@ -183,8 +183,13 @@ class CalibrationOverlay(private val context: Context) {
                         wm.updateViewLayout(cursorView, cursorParams)
                     }
                     MotionEvent.ACTION_UP -> {
-                        cursorX = ((cursorParams.x + cursorW / 2f) / screenW).coerceIn(0f, 1f)
-                        cursorY = ((cursorParams.y + cursorH / 2f) / screenH).coerceIn(0f, 1f)
+                        // 记录光标在屏幕的【真实物理位置】(含状态栏)：getLocationOnScreen 反映 view 实际渲染位置。
+                        // 不能用 cursorParams 推断——TYPE_APPLICATION_OVERLAY 的 LayoutParams.y 按内容区(不含状态栏)
+                        // 解释，而拖动用 rawY(含状态栏)，会系统性少一个状态栏高度，导致记录坐标偏上、点击偏到上方。
+                        val loc = IntArray(2)
+                        cursorView.getLocationOnScreen(loc)
+                        cursorX = ((loc[0] + cursorW / 2f) / screenW).coerceIn(0f, 1f)
+                        cursorY = ((loc[1] + cursorH / 2f) / screenH).coerceIn(0f, 1f)
                     }
                 }
                 true
