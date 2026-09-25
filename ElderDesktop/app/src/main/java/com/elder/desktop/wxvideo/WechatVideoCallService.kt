@@ -55,10 +55,8 @@ class WechatVideoCallService : AccessibilityService() {
         private const val LONG_PRESS_DURATION = 600
 
         // 各步骤之间的间隔（毫秒）。长按后粘贴气泡会快速消失，须短延迟点击。
-        private const val AFTER_ICON_MS = 3500L
-        private const val AFTER_LONG_PRESS_MS = 500L
-        /** 先轻点聚焦搜索框、再长按呼出「粘贴」之间的间隔。 */
-        private const val TAP_THEN_LONG_GAP_MS = 400L
+        private const val AFTER_ICON_MS = 2000L
+        private const val AFTER_LONG_PRESS_MS = 400L
         private const val AFTER_PASTE_MS = 2500L
         private const val AFTER_CONTACT_MS = 2500L
         private const val AFTER_PLUS_MS = 2000L
@@ -156,12 +154,11 @@ class WechatVideoCallService : AccessibilityService() {
         }
         val pt = cal.steps[index]
         if (index == 1) {
-            // 第 2 步（长按搜索框呼出「粘贴」）：先轻点确保搜索框聚焦，再长按。
-            // 若只单次长按，搜索框未聚焦时首次长按可能只聚焦、不弹粘贴（表现为"点击无粘贴"）。
+            // 第 2 步（长按搜索框呼出「粘贴」）：直接长按 0.6s。
             longPressSearchBox(pt, cal)
             Log.i(
                 TAG,
-                "replayStep index=1 tapThenLong at ${pt.x},${pt.y} screen=${cal.screenW}x${cal.screenH}",
+                "replayStep index=1 longPress at ${pt.x},${pt.y} screen=${cal.screenW}x${cal.screenH}",
             )
             return true
         }
@@ -237,7 +234,7 @@ class WechatVideoCallService : AccessibilityService() {
         if (index == 1) {
             // 长按搜索框：先轻点聚焦，再长按，确保呼出「粘贴」（与校准 replayStep 一致）。
             longPressSearchBox(pt, cal)
-            Log.i(TAG, "step2 (longPressSearchBox) tapThenLong at ${pt.x},${pt.y}")
+            Log.i(TAG, "step2 (longPressSearchBox) longPress at ${pt.x},${pt.y}")
         } else {
             val ok = dispatchGestureAt(pt, cal, TAP_DURATION)
             Log.i(TAG, "step${index + 1} (${stepName(index)}) at ${pt.x},${pt.y} ok=$ok")
@@ -296,13 +293,9 @@ class WechatVideoCallService : AccessibilityService() {
         else -> "confirmVideo"
     }
 
-    /** 搜索框长按呼出「粘贴」：先轻点确保输入框聚焦，间隔后再长按。 */
+    /** 搜索框直接长按呼出「粘贴」（长按 0.6s）。 */
     private fun longPressSearchBox(pt: CalibrationPoint, cal: WechatCalibration) {
-        dispatchGestureAt(pt, cal, TAP_DURATION)
-        handler.postDelayed(
-            { dispatchGestureAt(pt, cal, LONG_PRESS_DURATION) },
-            TAP_THEN_LONG_GAP_MS,
-        )
+        dispatchGestureAt(pt, cal, LONG_PRESS_DURATION)
     }
 
     private fun dispatchGestureAt(pt: CalibrationPoint, cal: WechatCalibration, duration: Int): Boolean {
