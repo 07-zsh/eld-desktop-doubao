@@ -186,17 +186,17 @@ class WechatVideoCallService : AccessibilityService() {
 
     /**
      * 拉起微信到前台并强制回到干净聊天列表。
-     * 不能用 getLaunchIntentForPackage 的恢复式启动：若微信后台停留在某个聊天/搜索界面，
-     * 会恢复旧界面而非聊天列表，导致校准坐标对不上。故用 FLAG_ACTIVITY_CLEAR_TASK 清栈重建主界面。
+     * 必须用 packageManager.getLaunchIntentForPackage 解析出的 intent（直接拼 ACTION_MAIN +
+     * CATEGORY_LAUNCHER + setPackage 的隐式 intent 在 Android 11+ 因包可见性会 resolve 到 null，
+     * 导致微信无法打开）；在其上叠加 FLAG_ACTIVITY_CLEAR_TASK，避免微信恢复旧聊天/搜索界面
+     * 而让校准坐标对不上。
      */
     private fun launchWechat() {
         val ok = runCatching {
-            val intent = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_LAUNCHER)
-                `package` = WECHAT_PACKAGE
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            }
-            startActivity(intent)
+            val launcher = packageManager.getLaunchIntentForPackage(WECHAT_PACKAGE)
+                ?: throw IllegalStateException("wechat launch intent not resolvable")
+            launcher.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            startActivity(launcher)
         }.isSuccess
         Log.i(TAG, "launch wechat (clear task) ok=$ok")
     }
