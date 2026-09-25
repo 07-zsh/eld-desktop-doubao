@@ -46,8 +46,17 @@ class CalibrationOverlay(private val context: Context) {
     }
 
     private val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private val screenW = context.resources.displayMetrics.widthPixels
-    private val screenH = context.resources.displayMetrics.heightPixels
+    // 统一用 getRealMetrics(物理全屏宽高) 做归一化/反归一化，与 CalibrationScreen/Service 的 cal.screenW/H 一致。
+    // 之前用 displayMetrics(可能不含导航栏/状态栏) 会导致光标记录坐标与实际点击坐标系统性偏差，
+    // 表现为"光标对准了目标、点击却偏到别处"。
+    private val screenW: Int
+    private val screenH: Int
+
+    init {
+        val (w, h) = realMetrics(context)
+        screenW = w
+        screenH = h
+    }
     private val density = context.resources.displayMetrics.density
 
     private var callback: Callback? = null
@@ -264,4 +273,19 @@ class CalibrationOverlay(private val context: Context) {
             flags,
             PixelFormat.TRANSLUCENT,
         ).apply { this.gravity = gravity; this.x = x; this.y = y }
+
+    /** 物理全屏宽高（与点击/校准存储一致）。 */
+    private fun realMetrics(context: Context): Pair<Int, Int> = try {
+        val dm = android.util.DisplayMetrics()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.display?.getRealMetrics(dm)
+        } else {
+            @Suppress("DEPRECATION")
+            (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
+                .defaultDisplay.getRealMetrics(dm)
+        }
+        Pair(dm.widthPixels, dm.heightPixels)
+    } catch (e: Exception) {
+        context.resources.displayMetrics.let { Pair(it.widthPixels, it.heightPixels) }
+    }
 }
