@@ -78,7 +78,7 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
         "先到微信【聊天列表】，把光标对准右上角「放大镜」（搜索）",
         "点放大镜进【搜索页】，把光标对准顶部「输入框」（长按会呼出粘贴）",
         "长按输入框呼出「粘贴」，把光标对准「粘贴」按钮",
-        "输入家人备注（测试甲），把光标对准【搜索结果】里的那一行（点进聊天）",
+        "确保搜索框已输入该家人备注，把光标对准【搜索结果】里的那一行（点进聊天）",
         "已进【聊天界面】，把光标对准右下角「+」",
         "点「+」弹出面板，把光标对准面板「视频通话」",
         "点面板视频弹出菜单，把光标对准菜单「视频通话」（验证即真呼出）",
@@ -130,6 +130,17 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
     val callback = remember(overlay, steps) {
         object : CalibrationOverlay.Callback {
             override fun onRecorded(index: Int, x: Float, y: Float) {
+                // 防呆：光标会继承上一步位置，若某步与上一步坐标几乎相同，判定为"没对准新目标"，
+                // 拒绝记录并提示重录（防止 step3/step4 等相邻步记成同一点，导致拨打时点错/点空）。
+                if (index > 0) {
+                    val prev = steps[index - 1]
+                    val dx = x - prev.x
+                    val dy = y - prev.y
+                    if (kotlin.math.sqrt(dx * dx + dy * dy) < 0.015f) {
+                        toast("第 ${index + 1} 步与上一步坐标几乎相同，请移动光标对准新目标后再记录")
+                        return
+                    }
+                }
                 steps[index] = CalibrationPoint(x, y)
                 toast("已记录第 ${index + 1}/7 步坐标，可点「验证此步」")
             }
