@@ -74,6 +74,30 @@ class WechatVideoCallServiceSignalTest {
     }
 
     @Test
+    fun `wechat main signal matches LauncherUI`() {
+        // 拉起微信后等聊天列表主界面出现，再开始第 1 步。
+        assertTrue(
+            WechatVideoCallService.matchSignal(
+                WechatVideoCallService.SIGNAL_WECHAT_MAIN, launcherUI, null,
+            ),
+        )
+    }
+
+    @Test
+    fun `wechat main signal rejects other windows`() {
+        assertFalse(
+            WechatVideoCallService.matchSignal(
+                WechatVideoCallService.SIGNAL_WECHAT_MAIN, chattingUI, null,
+            ),
+        )
+        assertFalse(
+            WechatVideoCallService.matchSignal(
+                WechatVideoCallService.SIGNAL_WECHAT_MAIN, callMenu, listOf("视频通话"),
+            ),
+        )
+    }
+
+    @Test
     fun `no waiting signal never matches`() {
         assertFalse(
             WechatVideoCallService.matchSignal(0, chattingUI, null),

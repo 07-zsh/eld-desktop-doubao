@@ -14,6 +14,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.elder.desktop.data.local.CalibrationPoint
 import com.elder.desktop.data.local.WechatCalibration
+import com.elder.desktop.util.AppLauncher
 
 /**
  * 功能2「一键微信视频」无障碍服务。
@@ -27,8 +28,8 @@ import com.elder.desktop.data.local.WechatCalibration
  *    - ChattingUI（com.tencent.mm.ui.chatting.ChattingUI）＝ 已进入目标聊天
  *    - dialog.a4 + 文本含「视频通话」＝ 通话类型菜单已弹出
  *  在这两处最脆弱的过渡用「等信号再点」，超时则回退按原延时执行；搜索段（放大镜/长按/粘贴/结果）
- *  无稳定类名信号，保留固定延时兜底。链路（自聊天列表起）：
- *    点放大镜 → 长按搜索框(粘贴备注) → 点粘贴 → 点搜索结果联系人 →
+ *  无稳定类名信号，保留固定延时兜底。链路（自拉起微信起）：
+ *    拉起微信(等 LauncherUI 主界面) → 点放大镜 → 长按搜索框(粘贴备注) → 点粘贴 → 点搜索结果联系人 →
  *    【等 ChattingUI】→ 点右下角加号 → 点面板"视频通话" →
  *    【等 dialog.a4】→ 点菜单"视频通话" → 发起呼叫。
  */
@@ -62,13 +63,19 @@ class WechatVideoCallService : AccessibilityService() {
         private const val AFTER_PLUS_MS = 2000L
         private const val AFTER_PANEL_VIDEO_MS = 1500L
         private const val RESTORE_CLIPBOARD_MS = 2500L
-        private const val TOTAL_TIMEOUT_MS = 30000L
+        private const val TOTAL_TIMEOUT_MS = 40000L
 
         // 事件驱动信号（真机实测 className）。
         private const val CLASS_CHATTING_UI = "com.tencent.mm.ui.chatting.ChattingUI"
         private const val CLASS_CALL_MENU = "com.tencent.mm.ui.widget.dialog.a4"
+        /** 微信聊天列表主界面（7 步起点的界面）；拉起微信后等它出现再开始第 1 步。 */
+        private const val CLASS_WECHAT_MAIN = "com.tencent.mm.ui.LauncherUI"
+        private const val WECHAT_PACKAGE = "com.tencent.mm"
+        /** 拉起微信后等主界面信号的超时兜底（冷启动偏慢）；超时则直接开始第 1 步。 */
+        private const val WECHAT_LAUNCH_FALLBACK_MS = 6000L
         internal const val SIGNAL_CHAT = 1
         internal const val SIGNAL_CALL_MENU = 2
+        internal const val SIGNAL_WECHAT_MAIN = 3
 
         /**
          * 信号匹配（纯函数，可单测）：判断收到的窗口事件是否命中当前等待的信号。
@@ -81,6 +88,7 @@ class WechatVideoCallService : AccessibilityService() {
                 SIGNAL_CHAT -> cls == CLASS_CHATTING_UI
                 SIGNAL_CALL_MENU -> cls == CLASS_CALL_MENU &&
                     text?.any { it.toString().contains("视频通话") } == true
+                SIGNAL_WECHAT_MAIN -> cls == CLASS_WECHAT_MAIN
                 else -> false
             }
     }
@@ -166,9 +174,19 @@ class WechatVideoCallService : AccessibilityService() {
         clipboardBackup = readClipboard()
         writeClipboard(remark.trim())
 
-        handler.postDelayed({ runStep(0, cal) }, 400)
+        // 关键前提修复：7 步坐标从「微信聊天列表」起算，但点「视频」时手机并不在微信。
+        // 故先拉起微信到前台（聊天列表），等微信主界面（LauncherUI）信号命中后再开始第 1 步；
+        // 冷启动慢/类名未命中时 6s 超时兜底直接开始。
+        launchWechat()
+        gateNext(0, cal, SIGNAL_WECHAT_MAIN, WECHAT_LAUNCH_FALLBACK_MS)
         handler.postDelayed({ finishWithTimeout() }, TOTAL_TIMEOUT_MS)
         return true
+    }
+
+    /** 拉起微信到前台（复用功能三 AppLauncher，ACTION_MAIN + CATEGORY_LAUNCHER）。 */
+    private fun launchWechat() {
+        val ok = AppLauncher.launch(this, WECHAT_PACKAGE)
+        Log.i(TAG, "launch wechat ok=$ok")
     }
 
     /** 执行指定步骤并按策略推进下一步（延时 or 等信号）。 */
