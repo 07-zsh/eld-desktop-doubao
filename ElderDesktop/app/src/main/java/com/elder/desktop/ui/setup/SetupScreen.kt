@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -25,11 +26,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.elder.desktop.data.di.AppContainer
 import com.elder.desktop.data.local.PresetImporter
+import com.elder.desktop.data.local.WechatCalibration
 import com.elder.desktop.ui.theme.EldBg
+import com.elder.desktop.ui.theme.EldMuted
 import com.elder.desktop.ui.theme.EldSub
 import com.elder.desktop.ui.theme.EldWhite
 import com.elder.desktop.util.Permissions
 import kotlinx.coroutines.launch
+
+/**
+ * 校准记录摘要文本（纯函数，可单测）。
+ * 未校准 → "未校准"；已校准 → 屏幕尺寸 + 微信版本 + 已录步数（含缺失步提示）。
+ */
+fun calibrationStatusText(cal: WechatCalibration): String {
+    if (!cal.calibrated) return "未校准"
+    val recorded = cal.steps.count { it.x != 0f || it.y != 0f }
+    return "已校准 · ${cal.screenW}x${cal.screenH} · 微信 ${cal.wechatVersion} · 已录 $recorded/7 步"
+}
 
 /**
  * 子女设置模式（D1）：唯一允许出现系统权限弹窗的阶段。
@@ -47,6 +60,13 @@ fun SetupScreen(
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf("正在为长辈准备桌面…") }
     var done by remember { mutableStateOf(false) }
+
+    // 校准记录：供设置页展示"微信视频校准"是否已完成及明细。
+    val calibration by produceState(
+        initialValue = WechatCalibration.empty(), container,
+    ) {
+        container.wechatCalibration.flow.collect { c -> value = c }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -116,6 +136,13 @@ fun SetupScreen(
                 Text("校准微信视频（一键视频）", color = EldWhite,
                     style = MaterialTheme.typography.bodyLarge)
             }
+            Spacer(Modifier.height(8.dp))
+            // 校准记录：显示已校准/未校准 + 屏幕尺寸 + 微信版本 + 已录步数
+            Text(
+                "微信视频校准：${calibrationStatusText(calibration)}",
+                color = if (calibration.calibrated) EldWhite else EldMuted,
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }

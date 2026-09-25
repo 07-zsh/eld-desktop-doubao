@@ -49,10 +49,18 @@ import java.io.File
 
 /**
  * 家人页（功能2 改版）：六宫格（3 行 × 2 列），可滚动。
- * 只显示已配「微信 ID（wxid）」的家人；空格隐藏、整体居中；仅点「视频」按钮发起微信视频。
+ * 只显示已配「微信备注（wechatRemark）」的家人（备注为空则该家人不出现在视频入口）；
+ * 空格隐藏、整体居中；仅点「视频」按钮发起微信视频。
  * 头像方形圆角、字体紧凑；视频按钮仍沿用现有已验证的 7 步机制（需备注+校准+无障碍），
- * 路线二深链（weixin://dl/chat?username=wxid）待真机验证后替换。
+ * 路线二深链（weixin://dl/chat?username=wxid）已真机判死，不再使用。
  */
+
+/**
+ * 六宫格家人过滤（纯函数，可单测）：只有填了非空微信备注的家人进入视频入口。
+ * 备注用于搜索路径剪贴板定位联系人；wxid 不再作为显示条件。
+ */
+fun videoEligibleContacts(contacts: List<Contact>): List<Contact> =
+    contacts.filter { !it.wechatRemark.isNullOrBlank() }
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FamilyScreen(container: AppContainer, onBack: () -> Unit) {
@@ -69,8 +77,8 @@ fun FamilyScreen(container: AppContainer, onBack: () -> Unit) {
         value = WechatVideoCallService.isEnabled(context)
     }
 
-    // 只显示已配 wxid 的家人（空格隐藏）
-    val videoContacts = contacts.filter { !it.wxid.isNullOrBlank() }
+    // 只显示已填微信备注的家人（空格隐藏；备注用于搜索定位，wxid 不再是显示条件）
+    val videoContacts = videoEligibleContacts(contacts)
 
     Column(
         modifier = Modifier.fillMaxSize().background(EldBg).padding(horizontal = 22.dp),
@@ -84,7 +92,7 @@ fun FamilyScreen(container: AppContainer, onBack: () -> Unit) {
         if (videoContacts.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
-                    "还没有可视频的家人\n请在设置里为家人填写微信 ID",
+                    "还没有可视频的家人\n请在设置里为家人填写微信备注",
                     color = EldSub, style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                 )
