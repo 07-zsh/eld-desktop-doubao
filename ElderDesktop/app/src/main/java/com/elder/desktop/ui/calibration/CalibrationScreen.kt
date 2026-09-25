@@ -49,6 +49,9 @@ import com.elder.desktop.ui.theme.EldSub
 import com.elder.desktop.ui.theme.EldWhite
 import com.elder.desktop.wxvideo.CalibrationOverlay
 import com.elder.desktop.wxvideo.WechatVideoCallService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -67,6 +70,9 @@ import kotlinx.coroutines.launch
 fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // 独立保存作用域：不随本页离开组合而取消。校准完成立即 onBack 返回设置页时，
+    // 若用 rememberCoroutineScope，协程会被页面销毁取消，导致校准数据未落盘（表现为"未校准"）。
+    val saveScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     val stepNames = listOf(
         "先到微信【聊天列表】，把光标对准右上角「放大镜」（搜索）",
@@ -112,7 +118,8 @@ fun CalibrationScreen(container: AppContainer, onBack: () -> Unit) {
     fun completeCalibration() {
         overlay.dismiss()
         toast("校准完成！一键微信视频已可用")
-        scope.launch {
+        // 用独立 saveScope 保存，确保 onBack 离开本页后协程不被取消，校准数据可靠落盘。
+        saveScope.launch {
             container.wechatCalibration.saveCalibration(
                 screenW, screenH, wechatVersion, steps.toList(),
             )
