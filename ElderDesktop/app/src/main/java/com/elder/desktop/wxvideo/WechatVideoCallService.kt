@@ -56,7 +56,9 @@ class WechatVideoCallService : AccessibilityService() {
 
         // 各步骤之间的间隔（毫秒）。长按后粘贴气泡会快速消失，须短延迟点击。
         private const val AFTER_ICON_MS = 2000L
-        private const val AFTER_LONG_PRESS_MS = 400L
+        // 长按搜索框(600ms)完成 + 气泡稳定(300ms)后再点粘贴；之前 400ms 在长按未结束时就去点，
+        // 气泡还没弹出导致粘贴失败（搜索框为空）。
+        private const val AFTER_LONG_PRESS_MS = 900L
         private const val AFTER_PASTE_MS = 2500L
         private const val AFTER_CONTACT_MS = 2500L
         private const val AFTER_PLUS_MS = 2000L
