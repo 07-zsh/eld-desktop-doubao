@@ -63,6 +63,8 @@ class WechatVideoCallService : AccessibilityService() {
         private const val AFTER_CONTACT_MS = 2500L
         private const val AFTER_PLUS_MS = 2000L
         private const val AFTER_PANEL_VIDEO_MS = 3000L
+        /** ChattingUI 信号命中后，聊天页仍需时间渲染加号按钮，否则 step5 手势被忽略。 */
+        private const val CHAT_UI_SETTLE_MS = 1500L
         private const val RESTORE_CLIPBOARD_MS = 2500L
         private const val TOTAL_TIMEOUT_MS = 45000L
 
@@ -243,7 +245,8 @@ class WechatVideoCallService : AccessibilityService() {
         }
         when (index) {
             // 点完联系人结果：等 ChattingUI（已进聊天）再点「＋」，避免点空。
-            3 -> gateNext(4, cal, SIGNAL_CHAT, AFTER_CONTACT_MS)
+            // 信号命中后再等 CHAT_UI_SETTLE_MS 让聊天页渲染完加号按钮。
+            3 -> gateNext(4, cal, SIGNAL_CHAT, AFTER_CONTACT_MS, CHAT_UI_SETTLE_MS)
             // 点完面板"视频通话"：等 dialog.a4 通话类型菜单弹出再点菜单"视频通话"确认。
             // 新版微信点面板"视频通话"直接拨号、不弹菜单，此时超时后【不要】执行 step7——
             // step7 在拨号界面上会误点挂断/取消，把刚拨出的电话挂掉（聊天记录满屏"已取消"的根因）。
@@ -269,12 +272,12 @@ class WechatVideoCallService : AccessibilityService() {
     }
 
     /** 信号门控：等 [signal] 命中后执行第 [index] 步；超时 [fallbackMs] 回退直接执行。 */
-    private fun gateNext(index: Int, cal: WechatCalibration, signal: Int, fallbackMs: Long) {
+    private fun gateNext(index: Int, cal: WechatCalibration, signal: Int, fallbackMs: Long, settleAfterSignalMs: Long = 0L) {
         if (!running) return
         waitingSignal = signal
         pendingStep = Runnable {
             waitingSignal = 0
-            runStep(index, cal)
+            handler.postDelayed({ runStep(index, cal) }, settleAfterSignalMs)
         }
         handler.postDelayed({
             if (waitingSignal == signal) {
