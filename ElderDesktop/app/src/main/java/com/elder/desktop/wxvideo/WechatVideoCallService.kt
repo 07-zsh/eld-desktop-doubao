@@ -62,7 +62,7 @@ class WechatVideoCallService : AccessibilityService() {
         private const val AFTER_PASTE_MS = 2500L
         private const val AFTER_CONTACT_MS = 2500L
         private const val AFTER_PLUS_MS = 2000L
-        private const val AFTER_PANEL_VIDEO_MS = 1500L
+        private const val AFTER_PANEL_VIDEO_MS = 3000L
         private const val RESTORE_CLIPBOARD_MS = 2500L
         private const val TOTAL_TIMEOUT_MS = 45000L
 
@@ -244,8 +244,10 @@ class WechatVideoCallService : AccessibilityService() {
         when (index) {
             // 点完联系人结果：等 ChattingUI（已进聊天）再点「＋」，避免点空。
             3 -> gateNext(4, cal, SIGNAL_CHAT, AFTER_CONTACT_MS)
-            // 点完面板"视频通话"：等 dialog.a4 菜单弹出再点菜单"视频通话"。
-            5 -> gateNext(6, cal, SIGNAL_CALL_MENU, AFTER_PANEL_VIDEO_MS)
+            // 点完面板"视频通话"：等 dialog.a4 通话类型菜单弹出再点菜单"视频通话"确认。
+            // 新版微信点面板"视频通话"直接拨号、不弹菜单，此时超时后【不要】执行 step7——
+            // step7 在拨号界面上会误点挂断/取消，把刚拨出的电话挂掉（聊天记录满屏"已取消"的根因）。
+            5 -> gatePanelVideoOrDirectDial(cal)
             // 全部完成：延时恢复剪贴板并复位。
             6 -> handler.postDelayed({ reset() }, RESTORE_CLIPBOARD_MS)
             else -> schedule(index + 1, cal, afterDelayMs(index))
@@ -283,6 +285,31 @@ class WechatVideoCallService : AccessibilityService() {
                 r?.run()
             }
         }, fallbackMs)
+    }
+
+    /**
+     * 点完面板"视频通话"后的两种走向：
+     *  - 旧版微信：弹 dialog.a4 通话类型菜单（含"视频通话"文本）→ 点 step7 确认；
+     *  - 新版微信：直接拨号，不弹菜单 → 超时后【跳过 step7】，否则 step7 在拨号界面误点挂断。
+     * 无论哪种，最终都走 reset 复位。
+     */
+    private fun gatePanelVideoOrDirectDial(cal: WechatCalibration) {
+        if (!running) return
+        waitingSignal = SIGNAL_CALL_MENU
+        pendingStep = Runnable {
+            waitingSignal = 0
+            // dialog.a4 菜单弹出了，点菜单里的"视频通话"确认
+            runStep(6, cal)
+        }
+        handler.postDelayed({
+            if (waitingSignal == SIGNAL_CALL_MENU) {
+                Log.i(TAG, "call menu not appeared (direct dial), skip confirm step7")
+                waitingSignal = 0
+                pendingStep = null
+                // 不做点 step7，等拨号界面稳定后复位
+                handler.postDelayed({ reset() }, 3000)
+            }
+        }, AFTER_PANEL_VIDEO_MS)
     }
 
     private fun stepName(index: Int): String = when (index) {
