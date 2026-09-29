@@ -130,7 +130,10 @@ class CalibrationOverlay(private val context: Context) {
         val row1 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         prevBtn = button("上一步") { callback?.onStepChanged(currentIndex - 1) }
         recordBtn = button("记录位置") { onRecord() }
-        verifyBtn = button("验证此步") { callback?.onVerifyRequested(currentIndex); phase = 1; refresh() }
+        verifyBtn = button("验证此步") {
+            phase = 1; refresh()
+            replayWithCursorHidden { callback?.onVerifyRequested(currentIndex) }
+        }
         row1.addView(prevBtn); row1.addView(recordBtn); row1.addView(verifyBtn)
 
         val row2 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
@@ -199,6 +202,23 @@ class CalibrationOverlay(private val context: Context) {
 
     private var dragDx = 0f
     private var dragDy = 0f
+
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** 回放单步：把光标窗口暂时移出屏幕，否则回放点落在光标悬浮窗上被拦截、穿不透到微信目标。 */
+    fun replayWithCursorHidden(onReplay: () -> Unit) {
+        val backX = cursorParams.x
+        val backY = cursorParams.y
+        cursorParams.x = -cursorW * 2
+        cursorParams.y = -cursorH * 2
+        runCatching { wm.updateViewLayout(cursorView, cursorParams) }
+        handler.postDelayed({ onReplay() }, 150)
+        handler.postDelayed({
+            cursorParams.x = backX
+            cursorParams.y = backY
+            runCatching { wm.updateViewLayout(cursorView, cursorParams) }
+        }, 1600)
+    }
 
     private fun button(text: String, onClick: () -> Unit): Button =
         Button(context).apply {
