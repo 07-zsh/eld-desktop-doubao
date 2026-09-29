@@ -65,6 +65,8 @@ class WechatVideoCallService : AccessibilityService() {
         private const val AFTER_PANEL_VIDEO_MS = 3000L
         /** ChattingUI 信号命中后，聊天页仍需时间渲染加号按钮，否则 step5 手势被忽略。 */
         private const val CHAT_UI_SETTLE_MS = 1500L
+        /** dialog.a4 菜单信号命中后，等菜单动画完成再点 step7，否则点空。 */
+        private const val CALL_MENU_SETTLE_MS = 500L
         private const val RESTORE_CLIPBOARD_MS = 2500L
         private const val TOTAL_TIMEOUT_MS = 45000L
 
@@ -301,8 +303,8 @@ class WechatVideoCallService : AccessibilityService() {
         waitingSignal = SIGNAL_CALL_MENU
         pendingStep = Runnable {
             waitingSignal = 0
-            // dialog.a4 菜单弹出了，点菜单里的"视频通话"确认
-            runStep(6, cal)
+            // dialog.a4 菜单弹出了，等动画完成再点 step7"视频通话"确认
+            handler.postDelayed({ runStep(6, cal) }, CALL_MENU_SETTLE_MS)
         }
         handler.postDelayed({
             if (waitingSignal == SIGNAL_CALL_MENU) {
