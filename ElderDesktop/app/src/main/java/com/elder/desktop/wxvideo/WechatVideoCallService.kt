@@ -6,12 +6,19 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.Path
+import android.graphics.PixelFormat
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.widget.TextView
 import com.elder.desktop.data.local.CalibrationPoint
 import com.elder.desktop.data.local.WechatCalibration
 
@@ -70,6 +77,9 @@ class WechatVideoCallService : AccessibilityService() {
         private const val RESTORE_CLIPBOARD_MS = 2500L
         private const val TOTAL_TIMEOUT_MS = 45000L
 
+        // 硬遮窗（防老人无意识误触）：手势前临时切穿透，等 WMS 处理完再下发。
+        private const val PENETRATE_SETTLE_MS = 120L
+
         // 事件驱动信号（真机实测 className）。
         private const val CLASS_CHATTING_UI = "com.tencent.mm.ui.chatting.ChattingUI"
         private const val CLASS_CALL_MENU = "com.tencent.mm.ui.widget.dialog.a4"
@@ -108,6 +118,12 @@ class WechatVideoCallService : AccessibilityService() {
     /** 信号命中后待执行的下一步。 */
     private var pendingStep: Runnable? = null
 
+    // 硬遮窗（防老人无意识误触）：全屏可触摸拦截 + 大字提示。
+    // 自动拨打期间显示；每次手势前临时切 FLAG_NOT_TOUCHABLE 让手势穿透到微信，完成后恢复拦截。
+    private var shieldView: View? = null
+    private var shieldParams: WindowManager.LayoutParams? = null
+    private var shieldPid = 0
+
     private val timeoutRunnable = Runnable {
         Log.w(TAG, "call timeout, reset")
         reset()
@@ -126,6 +142,7 @@ class WechatVideoCallService : AccessibilityService() {
 
     override fun onDestroy() {
         instance = null
+        hideShield()
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
@@ -188,6 +205,9 @@ class WechatVideoCallService : AccessibilityService() {
 
         clipboardBackup = readClipboard()
         writeClipboard(remark.trim())
+
+        // 防老人无意识误触：显示全屏硬遮窗（拦截触摸 + 大字提示），reset 时移除。
+        showShield()
 
         // 关键前提修复：7 步坐标从「微信聊天列表」起算，但点「视频」时手机并不在微信。
         // 故先拉起微信到前台（聊天列表），等微信主界面（LauncherUI）信号命中后再开始第 1 步；
@@ -332,6 +352,11 @@ class WechatVideoCallService : AccessibilityService() {
         dispatchGestureAt(pt, cal, LONG_PRESS_DURATION)
     }
 
+    /**
+     * 下发坐标手势。若遮窗处于激活状态（自动拨打流程），先临时切穿透再下发，
+     * 用 GestureResultCallback 检测是否真正送达；被拦截(completed=false)则重试。
+     * 校准 replayStep 时无遮窗，走原始直发逻辑（无穿透、无重试）。
+     */
     private fun dispatchGestureAt(pt: CalibrationPoint, cal: WechatCalibration, duration: Int): Boolean {
         return try {
             val x = pt.x * cal.screenW
@@ -339,11 +364,98 @@ class WechatVideoCallService : AccessibilityService() {
             val path = Path().apply { moveTo(x, y) }
             val stroke = GestureDescription.StrokeDescription(path, 0, duration.toLong())
             val gesture = GestureDescription.Builder().addStroke(stroke).build()
-            dispatchGesture(gesture, null, handler)
+            if (shieldView == null) {
+                dispatchGesture(gesture, null, handler)
+            } else {
+                dispatchShieldedGesture(gesture, duration.toLong())
+                true
+            }
         } catch (e: Exception) {
             Log.e(TAG, "dispatchGesture error: ${e.message}")
             false
         }
+    }
+
+    /**
+     * 遮窗激活时的穿透式手势：切穿透 → 等 WMS 处理 → 下发 → 手势时长 + 余量后恢复拦截。
+     * 未用 GestureResultCallback（该回调在此 SDK 的 Kotlin 映射下 override 签名不匹配），
+     * 改用固定延时恢复拦截；穿透前已留 PENETRATE_SETTLE_MS 等待 WMS，被遮窗拦截概率已很低。
+     */
+    private fun dispatchShieldedGesture(gesture: GestureDescription, duration: Long) {
+        if (!running) return
+        setShieldTouchable(false)
+        handler.postDelayed({
+            if (!running) return@postDelayed
+            try {
+                dispatchGesture(gesture, null, handler)
+            } catch (e: Exception) {
+                Log.e(TAG, "dispatchGesture error: ${e.message}")
+            }
+            // 手势完成后（duration + 余量）恢复拦截
+            handler.postDelayed({
+                if (running) setShieldTouchable(true)
+            }, duration + PENETRATE_SETTLE_MS + 80L)
+        }, PENETRATE_SETTLE_MS)
+    }
+
+    /**
+     * 显示全屏硬遮窗：拦截老人无意识误触 + 大字提示。
+     * 默认可触摸拦截；手势前由 setShieldTouchable(false) 临时穿透。
+     * 无悬浮窗权限时静默跳过（仅记录，不阻断拨打——遮窗是防护而非必需）。
+     */
+    private fun showShield() {
+        if (shieldView != null) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            !Settings.canDrawOverlays(this)
+        ) {
+            Log.w(TAG, "no overlay permission, skip shield")
+            return
+        }
+        runCatching {
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val tv = TextView(this).apply {
+                setBackgroundColor(0x99000000.toInt())
+                setTextColor(Color.WHITE)
+                textSize = 30f
+                gravity = Gravity.CENTER
+                text = "正在拨打视频\n请勿触摸屏幕"
+            }
+            val lp = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT,
+            ).apply { gravity = Gravity.CENTER }
+            wm.addView(tv, lp)
+            shieldView = tv
+            shieldParams = lp
+            Log.i(TAG, "shield shown")
+        }.onFailure { Log.e(TAG, "showShield error: ${it.message}") }
+    }
+
+    /** 隐藏并移除遮窗（幂等）。 */
+    private fun hideShield() {
+        val v = shieldView ?: return
+        shieldView = null
+        shieldParams = null
+        runCatching {
+            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeView(v)
+        }
+        Log.i(TAG, "shield hidden")
+    }
+
+    /** 切换遮窗触摸模式：true=可触摸拦截(默认)，false=FLAG_NOT_TOUCHABLE 穿透。 */
+    private fun setShieldTouchable(touchable: Boolean) {
+        val lp = shieldParams ?: return
+        lp.flags = if (touchable) {
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        } else {
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        }
+        runCatching {
+            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).updateViewLayout(shieldView, lp)
+        }.onFailure { Log.e(TAG, "setShieldTouchable error: ${it.message}") }
     }
 
     private fun writeClipboard(text: String) {
@@ -365,7 +477,7 @@ class WechatVideoCallService : AccessibilityService() {
         }
     }
 
-    /** 复位：停止本轮、清信号、恢复剪贴板。 */
+    /** 复位：停止本轮、清信号、恢复剪贴板、移除遮窗。 */
     private fun reset() {
         running = false
         waitingSignal = 0
@@ -373,6 +485,7 @@ class WechatVideoCallService : AccessibilityService() {
         handler.removeCallbacksAndMessages(null)
         clipboardBackup?.let { writeClipboard(it) }
         clipboardBackup = null
+        hideShield()
         Log.i(TAG, "reset done")
     }
 }
